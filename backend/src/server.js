@@ -5,22 +5,20 @@
  */
 
 import http from 'http';
-import express from 'express';
-import cors from 'cors';
 import { WebSocketServer, WebSocket } from 'ws';
-import { createTransitRouter } from './routes/transitRoutes.js';
+import { createApp } from './app.js';
 
-const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
-app.use(express.json());
-
 // Create HTTP server
-const server = http.createServer(app);
+const server = http.createServer();
 
 // Initialize WebSocket server
 const wss = new WebSocketServer({ server });
+
+// Attach Express app with WebSocket instance
+const app = createApp(wss);
+server.on('request', app);
 
 function broadcast(message) {
   const payload = JSON.stringify(message);
@@ -62,37 +60,6 @@ wss.on('connection', ws => {
 
   ws.on('close', () => {
     console.log('[WebSocket] Client disconnected.');
-  });
-});
-
-// Mount Routes
-app.use('/api', createTransitRouter());
-
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'HEALTHY',
-    system: 'SmartRail Navigator API',
-    dataNotice: 'Mumbai Central Line Suburban Rail Services (CSMT to Kalyan)',
-    uptimeSeconds: process.uptime(),
-    activeWebSockets: wss.clients.size
-  });
-});
-
-// 404 Not Found fallback for unmatched routes
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: `Cannot ${req.method} ${req.path}. Endpoint not found.`
-  });
-});
-
-// Centralized Express error handling middleware
-app.use((err, req, res, next) => {
-  console.error('[Server Error]', err);
-  const status = err.status || err.statusCode || 500;
-  res.status(status).json({
-    success: false,
-    error: err.message || 'Internal Server Error'
   });
 });
 
