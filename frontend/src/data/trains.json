@@ -1,0 +1,44 @@
+[
+  {
+    "id": "TR_EXP_101",
+    "serviceName": "Apex Gold Bullet 101",
+    "lineName": "Gold Express HSR",
+    "trainType": "High-Speed Rail",
+    "color": "#f59e0b",
+    "origin": "Central Grand Terminal",
+    "destination": "North Gate Terminal",
+    "status": "IN_TRANSIT",
+    "speedKmph": 185.0,
+    "delayMinutes": 0,
+    "nextStop": "River Junction Interchange",
+    "etaNext": "14:24"
+  },
+  {
+    "id": "TR_REG_202",
+    "serviceName": "GreenLine Regional 202",
+    "lineName": "Emerald Regional",
+    "trainType": "Regional Intercity",
+    "color": "#10b981",
+    "origin": "West Industrial Depot",
+    "destination": "River Junction Interchange",
+    "status": "ON_TIME",
+    "speedKmph": 110.0,
+    "delayMinutes": 2,
+    "nextStop": "Central Grand Terminal",
+    "etaNext": "14:32"
+  },
+  {
+    "id": "TR_SPH_303",
+    "serviceName": "Sapphire Feeder Metro 303",
+    "lineName": "Sapphire Metro",
+    "trainType": "Feeder Commuter",
+    "color": "#0ea5e9",
+    "origin": "East Harbor Maritime Hub",
+    "destination": "Central Grand Terminal",
+    "status": "BOARDING",
+    "speedKmph": 0.0,
+    "delayMinutes": 0,
+    "nextStop": "Central Grand Terminal",
+    "etaNext": "14:18"
+  }
+]

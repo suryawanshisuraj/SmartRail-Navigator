@@ -1,0 +1,52 @@
+[
+  {
+    "id": "STN_METRO_CENTRAL",
+    "code": "CTR",
+    "name": "Central Grand Terminal",
+    "city": "Metro City",
+    "coordinates": { "lat": 40.7128, "lng": -74.0060 },
+    "isWheelchairAccessible": true,
+    "platforms": ["1A", "1B", "2A", "2B", "3", "4"],
+    "facilities": ["Elevators", "Restrooms", "Ticket Office", "Baggage Storage", "Lounges"]
+  },
+  {
+    "id": "STN_RIVER_JUNCTION",
+    "code": "RVJ",
+    "name": "River Junction Interchange",
+    "city": "Metro City",
+    "coordinates": { "lat": 40.7488, "lng": -73.9854 },
+    "isWheelchairAccessible": true,
+    "platforms": ["1", "2", "3", "4B"],
+    "facilities": ["Elevators", "Restrooms", "Cafe", "Wheelchair Ramps"]
+  },
+  {
+    "id": "STN_NORTH_GATE",
+    "code": "NGT",
+    "name": "North Gate Terminal",
+    "city": "North Hills",
+    "coordinates": { "lat": 40.7891, "lng": -73.9592 },
+    "isWheelchairAccessible": true,
+    "platforms": ["1", "2", "3"],
+    "facilities": ["Elevators", "Restrooms", "Taxi Stand"]
+  },
+  {
+    "id": "STN_EAST_HARBOR",
+    "code": "EHB",
+    "name": "East Harbor Maritime Hub",
+    "city": "Harbor Bay",
+    "coordinates": { "lat": 40.7062, "lng": -73.9969 },
+    "isWheelchairAccessible": true,
+    "platforms": ["1", "2"],
+    "facilities": ["Ferry Connection", "Restrooms", "Ticket Office"]
+  },
+  {
+    "id": "STN_WEST_DEPOT",
+    "code": "WDP",
+    "name": "West Industrial Depot",
+    "city": "West End",
+    "coordinates": { "lat": 40.7282, "lng": -74.0321 },
+    "isWheelchairAccessible": false,
+    "platforms": ["1", "2"],
+    "facilities": ["Parking", "Ticket Machine"]
+  }
+]
