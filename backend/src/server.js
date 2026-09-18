@@ -30,13 +30,15 @@ function broadcast(message) {
 }
 
 // Periodic station real-time broadcast (Mumbai Central Line)
-setInterval(() => {
-  broadcast({
-    type: 'station_announcement',
-    message: 'Mumbai Central Railway Suburban Services running normally across CSMT, Dadar, Thane & Kalyan corridors. Follow indicator displays.',
-    timestamp: new Date().toISOString()
-  });
-}, 30000);
+if (!process.env.VERCEL) {
+  setInterval(() => {
+    broadcast({
+      type: 'station_announcement',
+      message: 'Mumbai Central Railway Suburban Services running normally across CSMT, Dadar, Thane & Kalyan corridors. Follow indicator displays.',
+      timestamp: new Date().toISOString()
+    });
+  }, 30000);
+}
 
 wss.on('connection', ws => {
   console.log('[WebSocket] Client connected to station real-time event gateway.');
@@ -63,7 +65,11 @@ wss.on('connection', ws => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`🚆 SmartRail Navigator API running on http://localhost:${PORT}`);
-  console.log(`🛰️ WebSocket real-time gateway active on ws://localhost:${PORT}`);
-});
+if (!process.env.VERCEL) {
+  server.listen(PORT, () => {
+    console.log(`🚆 SmartRail Navigator API running on http://localhost:${PORT}`);
+    console.log(`🛰️ WebSocket real-time gateway active on ws://localhost:${PORT}`);
+  });
+}
+
+export default app;
