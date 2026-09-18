@@ -9,7 +9,10 @@ import { Map, Layers } from 'lucide-react';
 import {
   fetchStationList,
   fetchStationData,
-  computeIndoorRoute
+  computeIndoorRoute,
+  getLiveGPSPosition,
+  findNearestStation,
+  haversineDistanceMeters
 } from './services/transitService';
 
 export default function App() {
@@ -27,6 +30,11 @@ export default function App() {
   const [announcement, setAnnouncement] = useState('');
   const [mapViewMode, setMapViewMode] = useState('REAL_MAP'); // 'REAL_MAP' or 'SCHEMATIC'
   const [isLoading, setIsLoading] = useState(true);
+
+  // Real Device GPS State
+  const [realGpsPosition, setRealGpsPosition] = useState(null);
+  const [isGpsActive, setIsGpsActive] = useState(false);
+  const [isGpsLoading, setIsGpsLoading] = useState(false);
 
   // Load Station Data
   const loadStation = useCallback(async (stnId, targetDestId = null) => {
@@ -82,6 +90,7 @@ export default function App() {
   // Handle Station Switch from Navbar dropdown
   const handleSelectStation = async (newStationId) => {
     setSelectedStationId(newStationId);
+    setIsGpsActive(false);
     await loadStation(newStationId);
   };
 
@@ -95,7 +104,8 @@ export default function App() {
       currentLocationNode.id,
       targetDest,
       activeMode,
-      selectedStationId
+      selectedStationId,
+      currentLocationNode.isRealGps ? currentLocationNode : null
     );
     setCalculatedRoute(res);
 
@@ -112,9 +122,79 @@ export default function App() {
     }
   };
 
+  // Handle Real Device GPS Geolocation
+  const handleDetectRealLocation = async () => {
+    setIsGpsLoading(true);
+    setAnnouncement('Locating you via device GPS satellites...');
+    try {
+      const pos = await getLiveGPSPosition();
+      setRealGpsPosition(pos);
+      setIsGpsActive(true);
+
+      // Find nearest station along Mumbai Central line
+      const nearest = findNearestStation(pos.lat, pos.lng);
+
+      let targetStationId = selectedStationId;
+      let targetStationData = stationData;
+
+      if (nearest && nearest.id !== selectedStationId && nearest.distanceMeters < 50000) {
+        setAnnouncement(`Live GPS detected you near ${nearest.name} (${(nearest.distanceMeters / 1000).toFixed(1)} km away). Switching station...`);
+        setSelectedStationId(nearest.id);
+        targetStationId = nearest.id;
+        targetStationData = await fetchStationData(nearest.id);
+        setStationData(targetStationData);
+      }
+
+      // Find closest entrance in target station data
+      const entranceNodes = (targetStationData?.nodes || []).filter(n => n.type === 'ENTRANCE' || n.type === 'CORRIDOR');
+      const nearestEntrance = entranceNodes[0] || targetStationData?.nodes[0];
+
+      // Construct dynamic Real GPS Node
+      const gpsNode = {
+        id: 'NODE_USER_REAL_GPS',
+        name: 'My Live GPS Location',
+        floor_id: 1,
+        lat: pos.lat,
+        lng: pos.lng,
+        x: nearestEntrance?.x !== undefined ? nearestEntrance.x : 80,
+        y: nearestEntrance?.y !== undefined ? nearestEntrance.y : 480,
+        type: 'ENTRANCE',
+        isRealGps: true,
+        accuracy: pos.accuracy,
+        heading: pos.heading,
+        description: `Live GPS: ${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)} (±${pos.accuracy}m)`
+      };
+
+      setCurrentLocationNode(gpsNode);
+
+      // Route destination
+      const targetDest = selectedDestinationId || (targetStationData?.nodes.find(n => n.type === 'PLATFORM')?.id) || targetStationData?.nodes[1]?.id;
+      setSelectedDestinationId(targetDest);
+
+      const res = await computeIndoorRoute(
+        gpsNode.id,
+        targetDest,
+        accessibleMode ? 'ACCESSIBLE' : routeType,
+        targetStationId,
+        gpsNode
+      );
+      setCalculatedRoute(res);
+
+      const destNode = targetStationData?.nodes.find(n => n.id === targetDest);
+      setAnnouncement(`GPS Locked! Accuracy ±${pos.accuracy}m. Wayfinding path ready to ${destNode?.name || 'Platform'}.`);
+    } catch (err) {
+      console.error('GPS error:', err);
+      setAnnouncement(`Location status: ${err.message || 'Could not obtain device location. Please check browser location permissions.'}`);
+      setIsGpsActive(false);
+    } finally {
+      setIsGpsLoading(false);
+    }
+  };
+
   // QR Location detected
   const handleLocationDetected = async (node) => {
     setCurrentLocationNode(node);
+    setIsGpsActive(false);
     setActiveFloor(node.floor_id === 2 ? 1 : 0);
     setAnnouncement(`Current location updated to ${node.name}.`);
 
@@ -167,6 +247,9 @@ export default function App() {
         setAccessibleMode={handleToggleAccessibleMode}
         language={language}
         setLanguage={setLanguage}
+        onDetectRealLocation={handleDetectRealLocation}
+        isGpsActive={isGpsActive}
+        isGpsLoading={isGpsLoading}
       />
 
       {/* Main Dashboard Workspace */}
@@ -252,6 +335,10 @@ export default function App() {
               destinationNode={destinationNode}
               calculatedRoute={calculatedRoute}
               accessibleMode={accessibleMode}
+              realGpsPosition={realGpsPosition}
+              onDetectRealLocation={handleDetectRealLocation}
+              isGpsActive={isGpsActive}
+              isGpsLoading={isGpsLoading}
               onNodeClick={(node) => {
                 setSelectedDestinationId(node.id);
                 handleCalculateRoute(node.id, routeType);
@@ -288,6 +375,11 @@ export default function App() {
             onCalculateRoute={handleCalculateRoute}
             language={language}
             accessibleMode={accessibleMode}
+            currentLocationNode={currentLocationNode}
+            onDetectRealLocation={handleDetectRealLocation}
+            isGpsActive={isGpsActive}
+            isGpsLoading={isGpsLoading}
+            realGpsPosition={realGpsPosition}
           />
 
           <AIAssistantDrawer

@@ -1,5 +1,21 @@
 import React, { useState } from 'react';
-import { Navigation, Clock, ShieldCheck, Volume2, VolumeX, AlertTriangle, CheckCircle, Train } from 'lucide-react';
+import {
+  Navigation,
+  Clock,
+  ShieldCheck,
+  Volume2,
+  VolumeX,
+  AlertTriangle,
+  CheckCircle,
+  Train,
+  LocateFixed,
+  Compass,
+  ArrowUp,
+  ArrowRight,
+  ArrowLeft,
+  CornerUpRight,
+  CornerUpLeft
+} from 'lucide-react';
 
 export default function NavigationPanel({
   station,
@@ -11,7 +27,12 @@ export default function NavigationPanel({
   calculatedRoute,
   onCalculateRoute,
   language,
-  accessibleMode
+  accessibleMode,
+  currentLocationNode,
+  onDetectRealLocation,
+  isGpsActive,
+  isGpsLoading,
+  realGpsPosition
 }) {
   const [isSpeaking, setIsSpeaking] = useState(false);
 
@@ -56,11 +77,11 @@ export default function NavigationPanel({
   };
 
   return (
-    <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
+    <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }}>
       {/* Title & Voice Guidance Button */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Navigation size={18} color="var(--accent-cyan)" />
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Navigation size={18} color="#0284c7" />
           <span>Platform Wayfinding</span>
         </h3>
 
@@ -76,6 +97,68 @@ export default function NavigationPanel({
           {isSpeaking ? <VolumeX size={14} /> : <Volume2 size={14} />}
           <span>{isSpeaking ? 'Stop Voice' : `Voice (${language.toUpperCase()})`}</span>
         </button>
+      </div>
+
+      {/* Start Location Card with Real GPS Button */}
+      <div style={{
+        background: isGpsActive ? '#f0f9ff' : '#f8fafc',
+        border: isGpsActive ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
+        borderRadius: 'var(--radius-md)',
+        padding: '0.75rem 0.9rem',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '0.75rem'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <div style={{
+            width: '28px',
+            height: '28px',
+            borderRadius: '50%',
+            background: isGpsActive ? '#0284c7' : '#e2e8f0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: isGpsActive ? '#ffffff' : '#64748b',
+            flexShrink: 0
+          }}>
+            <LocateFixed size={16} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
+              {isGpsActive ? '📍 Live Real GPS Starting Point' : 'Start Location (Station Gate)'}
+            </div>
+            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>
+              {currentLocationNode?.name || 'Main Entrance'}
+            </div>
+          </div>
+        </div>
+
+        {onDetectRealLocation && (
+          <button
+            type="button"
+            onClick={onDetectRealLocation}
+            disabled={isGpsLoading}
+            style={{
+              background: isGpsActive ? '#0284c7' : '#ffffff',
+              color: isGpsActive ? '#ffffff' : '#0284c7',
+              border: isGpsActive ? 'none' : '1.5px solid #0284c7',
+              borderRadius: '8px',
+              padding: '0.35rem 0.65rem',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.3rem',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
+            }}
+          >
+            <LocateFixed size={13} />
+            <span>{isGpsLoading ? 'Locating...' : isGpsActive ? 'GPS Locked 🟢' : 'Use Real GPS'}</span>
+          </button>
+        )}
       </div>
 
       {/* Destination Dropdown */}
@@ -216,35 +299,82 @@ export default function NavigationPanel({
         </div>
       )}
 
-      {/* Step-by-Step Directions */}
-      {calculatedRoute && calculatedRoute.instructions && (
+      {/* Step-by-Step Directions with Precise Direction Turns & Icons */}
+      {calculatedRoute && (calculatedRoute.maneuvers || calculatedRoute.instructions) && (
         <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem' }}>
-          <h4 style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-            Turn-by-Turn Wayfinding Steps
-          </h4>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <h4 style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+              Turn-by-Turn Wayfinding Steps
+            </h4>
+            <span style={{ fontSize: '0.7rem', color: '#0284c7', fontWeight: 700 }}>
+              {(calculatedRoute.maneuvers || calculatedRoute.instructions).length} steps
+            </span>
+          </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto' }}>
-            {calculatedRoute.instructions.map((step, i) => (
-              <div
-                key={i}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '0.5rem',
-                  fontSize: '0.8rem',
-                  color: '#1e293b',
-                  padding: '0.4rem 0.6rem',
-                  borderRadius: 'var(--radius-sm)',
-                  background: '#f8fafc',
-                  border: '1px solid #f1f5f9'
-                }}
-              >
-                <span className="badge badge-cyan" style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem', background: '#e0f2fe', color: '#0369a1' }}>
-                  {i + 1}
-                </span>
-                <span style={{ lineHeight: '1.4' }}>{step}</span>
-              </div>
-            ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', maxHeight: '220px', overflowY: 'auto' }}>
+            {calculatedRoute.maneuvers && calculatedRoute.maneuvers.length > 0 ? (
+              calculatedRoute.maneuvers.map((m, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '0.5rem',
+                    fontSize: '0.8rem',
+                    color: '#1e293b',
+                    padding: '0.45rem 0.65rem',
+                    borderRadius: 'var(--radius-sm)',
+                    background: '#f8fafc',
+                    border: '1px solid #f1f5f9'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '16px', flexShrink: 0 }}>
+                      {m.icon || '➡️'}
+                    </span>
+                    <div>
+                      <div style={{ fontWeight: 700, lineHeight: '1.3' }}>
+                        {m.instruction}
+                      </div>
+                      {m.cardinal && m.distance > 0 && (
+                        <div style={{ fontSize: '0.68rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <span>Heading: {m.cardinal}</span>
+                          <span>&bull;</span>
+                          <span>{m.distance}m</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <span className="badge badge-cyan" style={{ fontSize: '0.65rem', padding: '0.15rem 0.4rem', background: '#e0f2fe', color: '#0369a1', flexShrink: 0 }}>
+                    Step {i + 1}
+                  </span>
+                </div>
+              ))
+            ) : (
+              calculatedRoute.instructions.map((step, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '0.5rem',
+                    fontSize: '0.8rem',
+                    color: '#1e293b',
+                    padding: '0.4rem 0.6rem',
+                    borderRadius: 'var(--radius-sm)',
+                    background: '#f8fafc',
+                    border: '1px solid #f1f5f9'
+                  }}
+                >
+                  <span className="badge badge-cyan" style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem', background: '#e0f2fe', color: '#0369a1' }}>
+                    {i + 1}
+                  </span>
+                  <span style={{ lineHeight: '1.4' }}>{step}</span>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}

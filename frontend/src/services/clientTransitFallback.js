@@ -263,10 +263,59 @@ export function getClientStationLayout(stationId = 1) {
   };
 }
 
+export function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+  const R = 6371e3;
+  const rad = Math.PI / 180;
+  const phi1 = lat1 * rad;
+  const phi2 = lat2 * rad;
+  const deltaPhi = (lat2 - lat1) * rad;
+  const deltaLambda = (lon2 - lon1) * rad;
+
+  const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+            Math.cos(phi1) * Math.cos(phi2) *
+            Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c);
+}
+
+export function calculateBearing(lat1, lng1, lat2, lng2) {
+  if (lat1 === undefined || lng1 === undefined || lat2 === undefined || lng2 === undefined) return 0;
+  const rad = Math.PI / 180;
+  const phi1 = lat1 * rad;
+  const phi2 = lat2 * rad;
+  const deltaLambda = (lng2 - lng1) * rad;
+  const y = Math.sin(deltaLambda) * Math.cos(phi2);
+  const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+  const theta = Math.atan2(y, x);
+  return ((theta * 180 / Math.PI) + 360) % 360;
+}
+
+export function bearingToCardinal(deg) {
+  const directions = ['North (N)', 'North-East (NE)', 'East (E)', 'South-East (SE)', 'South (S)', 'South-West (SW)', 'West (W)', 'North-West (NW)'];
+  const index = Math.round(((deg % 360) / 45)) % 8;
+  return directions[index];
+}
+
+export function findNearestStation(userLat, userLng) {
+  let nearest = CLIENT_CENTRAL_LINE_STATIONS[0];
+  let minDistance = Infinity;
+
+  CLIENT_CENTRAL_LINE_STATIONS.forEach(stn => {
+    const dist = haversineDistanceMeters(userLat, userLng, stn.lat, stn.lng);
+    if (dist < minDistance) {
+      minDistance = dist;
+      nearest = stn;
+    }
+  });
+
+  return { station: nearest, distanceMeters: minDistance };
+}
+
 function clientHeuristic(nodeA, nodeB) {
   if (!nodeA || !nodeB) return 0;
-  const dx = nodeA.x - nodeB.x;
-  const dy = nodeA.y - nodeB.y;
+  const dx = (nodeA.x || 0) - (nodeB.x || 0);
+  const dy = (nodeA.y || 0) - (nodeB.y || 0);
   const horizontalDist = Math.sqrt(dx * dx + dy * dy);
   const floorDiff = Math.abs((nodeA.floor_id || 1) - (nodeB.floor_id || 1));
   return horizontalDist + floorDiff * 60;
@@ -285,6 +334,17 @@ export function calculateClientAStarRoute(graph, startNodeId, destinationNodeId,
       estimatedTime: 0,
       route: [node],
       instructions: ['You are already at your destination.'],
+      maneuvers: [{
+        stepIndex: 1,
+        instruction: 'You have arrived at your destination.',
+        type: 'ARRIVE',
+        icon: '🏁',
+        distance: 0,
+        estimatedTime: 0,
+        bearing: 0,
+        fromNode: node,
+        toNode: node
+      }],
       routeType,
       accessibilityStatus: true
     };
@@ -335,11 +395,111 @@ export function calculateClientAStarRoute(graph, startNodeId, destinationNodeId,
         totalTime += e.estimated_time;
       });
 
-      const instructions = pathNodes.map((n, i) => {
-        if (i === 0) return `Start at ${n.name}`;
-        if (i === pathNodes.length - 1) return `Arrive at destination: ${n.name}`;
-        return `Head towards ${n.name}`;
+      // Generate structured maneuvers with directional bearings
+      const maneuvers = [];
+      const instructions = [];
+
+      for (let i = 0; i < pathEdges.length; i++) {
+        const fromNode = pathNodes[i];
+        const toNode = pathNodes[i + 1];
+        const edge = pathEdges[i];
+
+        const bearing = Math.round(calculateBearing(fromNode.lat, fromNode.lng, toNode.lat, toNode.lng));
+        const cardinal = bearingToCardinal(bearing);
+
+        let type = 'STRAIGHT';
+        let icon = '⬆️';
+        let turnText = `Head ${cardinal} for ${edge.distance}m toward ${toNode.name}`;
+
+        if (fromNode.isRealGps) {
+          type = 'GPS_START';
+          icon = '📍';
+          turnText = `Start from your Live GPS Location: Walk ${edge.distance}m ${cardinal} to ${toNode.name}`;
+        } else if (toNode.type === 'LIFT') {
+          type = 'LIFT';
+          icon = '🛗';
+          turnText = `Take ${toNode.name} to change levels (${edge.distance}m)`;
+        } else if (toNode.type === 'STAIRS') {
+          type = 'STAIRS';
+          icon = '🪜';
+          turnText = `Take stairs via ${toNode.name} (${edge.distance}m)`;
+        } else if (toNode.type === 'PLATFORM') {
+          type = 'PLATFORM';
+          icon = '🚆';
+          turnText = `Boarding Deck: Arrive at ${toNode.name} (${edge.distance}m)`;
+        } else if (i > 0) {
+          const prevNode = pathNodes[i - 1];
+          const prevBearing = Math.round(calculateBearing(prevNode.lat, prevNode.lng, fromNode.lat, fromNode.lng));
+          let diff = bearing - prevBearing;
+          while (diff < -180) diff += 360;
+          while (diff > 180) diff -= 360;
+
+          if (diff > 25 && diff <= 70) {
+            type = 'SLIGHT_RIGHT';
+            icon = '↗️';
+            turnText = `Bear slightly right toward ${toNode.name} (${edge.distance}m)`;
+          } else if (diff > 70 && diff <= 120) {
+            type = 'TURN_RIGHT';
+            icon = '➡️';
+            turnText = `Turn right onto ${toNode.name} (${edge.distance}m)`;
+          } else if (diff > 120 && diff < 160) {
+            type = 'SHARP_RIGHT';
+            icon = '↪️';
+            turnText = `Sharp right toward ${toNode.name} (${edge.distance}m)`;
+          } else if (diff < -25 && diff >= -70) {
+            type = 'SLIGHT_LEFT';
+            icon = '↖️';
+            turnText = `Bear slightly left toward ${toNode.name} (${edge.distance}m)`;
+          } else if (diff < -70 && diff >= -120) {
+            type = 'TURN_LEFT';
+            icon = '⬅️';
+            turnText = `Turn left onto ${toNode.name} (${edge.distance}m)`;
+          } else if (diff < -120 && diff > -160) {
+            type = 'SHARP_LEFT';
+            icon = '↩️';
+            turnText = `Sharp left toward ${toNode.name} (${edge.distance}m)`;
+          } else if (Math.abs(diff) >= 160) {
+            type = 'U_TURN';
+            icon = '🔄';
+            turnText = `Turn around toward ${toNode.name} (${edge.distance}m)`;
+          } else {
+            type = 'STRAIGHT';
+            icon = '⬆️';
+            turnText = `Walk straight ${edge.distance}m toward ${toNode.name}`;
+          }
+        }
+
+        maneuvers.push({
+          stepIndex: i + 1,
+          instruction: turnText,
+          type,
+          icon,
+          distance: edge.distance,
+          estimatedTime: edge.estimated_time,
+          bearing,
+          cardinal,
+          fromNode,
+          toNode
+        });
+
+        instructions.push(turnText);
+      }
+
+      // Final destination arrival
+      const finalNode = pathNodes[pathNodes.length - 1];
+      maneuvers.push({
+        stepIndex: maneuvers.length + 1,
+        instruction: `Arrive at destination: ${finalNode.name}.`,
+        type: 'ARRIVE',
+        icon: '🏁',
+        distance: 0,
+        estimatedTime: 0,
+        bearing: maneuvers[maneuvers.length - 1]?.bearing || 0,
+        cardinal: maneuvers[maneuvers.length - 1]?.cardinal || 'N',
+        fromNode: finalNode,
+        toNode: finalNode
       });
+      instructions.push(`Arrive at destination: ${finalNode.name}.`);
 
       return {
         success: true,
@@ -347,6 +507,7 @@ export function calculateClientAStarRoute(graph, startNodeId, destinationNodeId,
         estimatedTime: totalTime,
         route: pathNodes,
         instructions,
+        maneuvers,
         routeType,
         accessibilityStatus: routeType === 'ACCESSIBLE' ? true : pathNodes.every(n => n.accessible)
       };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Compass, QrCode, Accessibility, Globe, Train } from 'lucide-react';
+import { Compass, QrCode, Accessibility, Globe, Train, LocateFixed } from 'lucide-react';
 
 export default function Navbar({
   stations = [],
@@ -10,7 +10,10 @@ export default function Navbar({
   accessibleMode,
   setAccessibleMode,
   language,
-  setLanguage
+  setLanguage,
+  onDetectRealLocation,
+  isGpsActive,
+  isGpsLoading
 }) {
   const currentStation = stations.find(s => s.id === Number(selectedStationId)) || stations[0];
 
@@ -44,7 +47,7 @@ export default function Navbar({
           <Train size={14} color="#b45309" />
           <span>Mumbai Suburban Railway &bull; Central Line Corridor (CSMT to Kalyan &bull; 26 Stations)</span>
         </div>
-        <span style={{ color: '#78716c' }}>Demo/Simulated Station Data</span>
+        <span style={{ color: '#78716c' }}>Live GPS Wayfinding Enabled</span>
       </div>
 
       {/* Main Bar */}
@@ -52,8 +55,8 @@ export default function Navbar({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0.85rem 2rem',
-        gap: '1.5rem',
+        padding: '0.75rem 2rem',
+        gap: '1.25rem',
         flexWrap: 'wrap'
       }}>
         {/* Brand & Central Line Station Selector */}
@@ -121,26 +124,54 @@ export default function Navbar({
           display: 'flex',
           alignItems: 'center',
           gap: '0.5rem',
-          background: '#f1f5f9',
-          border: '1px solid #e2e8f0',
+          background: isGpsActive ? '#f0f9ff' : '#f1f5f9',
+          border: isGpsActive ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
           padding: '0.45rem 1rem',
           borderRadius: 'var(--radius-full)',
           fontSize: '0.8rem'
         }}>
-          <span style={{ color: 'var(--text-secondary)' }}>Location:</span>
-          <strong style={{ color: '#0284c7' }}>
+          <span style={{ color: 'var(--text-secondary)' }}>{isGpsActive ? '📍 GPS Location:' : 'Station Gate:'}</span>
+          <strong style={{ color: isGpsActive ? '#0284c7' : '#0f172a' }}>
             {currentLocationNode?.name || 'Main Entrance'}
           </strong>
         </div>
 
         {/* Controls & Tools */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+          {/* Real GPS Button */}
+          {onDetectRealLocation && (
+            <button
+              type="button"
+              onClick={onDetectRealLocation}
+              disabled={isGpsLoading}
+              style={{
+                background: isGpsActive ? '#0284c7' : '#ffffff',
+                color: isGpsActive ? '#ffffff' : '#0284c7',
+                border: '1.5px solid #0284c7',
+                borderRadius: 'var(--radius-md)',
+                padding: '0.45rem 0.85rem',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                boxShadow: isGpsActive ? '0 2px 6px rgba(2, 132, 199, 0.3)' : '0 1px 2px rgba(0,0,0,0.03)',
+                transition: 'all 0.15s ease'
+              }}
+              title="Locate my position using real GPS coordinates"
+            >
+              <LocateFixed size={15} />
+              <span>{isGpsLoading ? 'Locking GPS...' : isGpsActive ? 'Real GPS Active 🟢' : 'Use Real Location'}</span>
+            </button>
+          )}
+
           {/* QR Scanner Trigger */}
           <button
             type="button"
             onClick={onOpenQRScanner}
-            className="btn btn-primary"
-            style={{ padding: '0.45rem 0.95rem', fontSize: '0.8rem' }}
+            className="btn btn-secondary"
+            style={{ padding: '0.45rem 0.85rem', fontSize: '0.78rem' }}
             aria-label="Scan Station QR Code to locate yourself"
           >
             <QrCode size={15} />

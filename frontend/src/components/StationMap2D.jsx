@@ -123,7 +123,9 @@ export default function StationMap2D({
             <path
               d={routeNodes.reduce((acc, curr, idx) => {
                 const prefix = idx === 0 ? 'M' : 'L';
-                return `${acc} ${prefix} ${curr.x} ${curr.y}`;
+                const px = curr.x !== undefined ? curr.x : 80;
+                const py = curr.y !== undefined ? curr.y : 480;
+                return `${acc} ${prefix} ${px} ${py}`;
               }, '')}
               fill="none"
               stroke={accessibleMode ? '#059669' : '#0284c7'}

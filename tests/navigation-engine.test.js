@@ -71,3 +71,36 @@ describe('Station Navigation Engine (A*)', () => {
     expect(result.instructions[0]).toMatch(/already at your destination/i);
   });
 });
+
+describe('Real GPS Geolocation & Direction Calculations', () => {
+  it('should calculate accurate Haversine distance between Mumbai coordinates', async () => {
+    const { haversineDistanceMeters } = await import('../frontend/src/services/clientTransitFallback.js');
+    // CSMT (18.9400, 72.8353) to Masjid (18.9515, 72.8385) ~1.3km
+    const dist = haversineDistanceMeters(18.9400, 72.8353, 18.9515, 72.8385);
+    expect(dist).toBeGreaterThan(1200);
+    expect(dist).toBeLessThan(1500);
+  });
+
+  it('should calculate correct bearing and cardinal direction', async () => {
+    const { calculateBearing, bearingToCardinal } = await import('../frontend/src/services/clientTransitFallback.js');
+    // Heading directly North
+    const bearingNorth = calculateBearing(18.9400, 72.8353, 18.9600, 72.8353);
+    expect(bearingNorth).toBeCloseTo(0, 0);
+    expect(bearingToCardinal(bearingNorth)).toBe('North (N)');
+
+    // Heading East
+    const bearingEast = calculateBearing(18.9400, 72.8353, 18.9400, 72.8553);
+    expect(bearingEast).toBeCloseTo(90, 0);
+    expect(bearingToCardinal(bearingEast)).toBe('East (E)');
+  });
+
+  it('should find nearest Central Line station to coordinates', async () => {
+    const { findNearestStation } = await import('../frontend/src/services/clientTransitFallback.js');
+    // Near Dadar coordinates (19.0180, 72.8430)
+    const result = findNearestStation(19.0180, 72.8430);
+    expect(result.station).toBeDefined();
+    expect(result.station.code).toBe('DR'); // Dadar
+    expect(result.distanceMeters).toBeLessThan(500);
+  });
+});
+
