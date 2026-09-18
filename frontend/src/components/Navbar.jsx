@@ -1,5 +1,6 @@
-import React from 'react';
-import { Compass, QrCode, Accessibility, Globe, Train, LocateFixed } from 'lucide-react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Compass, QrCode, Accessibility, Globe, Train, LocateFixed, Search, X } from 'lucide-react';
+import { searchRealStations } from '../data/realIndianStations';
 
 export default function Navbar({
   stations = [],
@@ -17,10 +18,49 @@ export default function Navbar({
   activeTab = 'WAYFINDING',
   onSelectTab
 }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchContainerRef = useRef(null);
+
   const currentStation = stations.find(s => s.id === Number(selectedStationId)) || stations[0];
 
-  // Group stations by zone
-  const zones = ['South Mumbai', 'Central Mumbai', 'Eastern Suburbs', 'Thane Zone', 'Beyond Thane'];
+  // Search results based on live query (case-insensitive, exact & partial)
+  const searchResults = useMemo(() => {
+    if (!searchQuery || !searchQuery.trim()) return [];
+    const q = searchQuery.trim().toLowerCase();
+    const listToSearch = stations.length > 0 ? stations : searchRealStations(q);
+    return listToSearch.filter(s =>
+      s.name.toLowerCase().includes(q) ||
+      s.code.toLowerCase().includes(q) ||
+      (s.city && s.city.toLowerCase().includes(q))
+    );
+  }, [searchQuery, stations]);
+
+  // Close search dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target)) {
+        setIsSearchOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Categorize stations by line/zone
+  const categories = useMemo(() => {
+    const western = stations.filter(s => s.railwayLines?.some(l => l.includes('Western')) || s.zone?.includes('Western'));
+    const central = stations.filter(s => s.railwayLines?.some(l => l.includes('Central')) || s.zone?.includes('Central'));
+    const harbour = stations.filter(s => s.railwayLines?.some(l => l.includes('Harbour') || l.includes('Trans-Harbour')));
+    const others = stations.filter(s => !western.includes(s) && !central.includes(s) && !harbour.includes(s));
+
+    return [
+      { name: 'Western Railway (WR)', list: western },
+      { name: 'Central Railway (CR)', list: central },
+      { name: 'Harbour & Trans-Harbour', list: harbour },
+      ...(others.length > 0 ? [{ name: 'Other Indian Stations', list: others }] : [])
+    ];
+  }, [stations]);
 
   return (
     <header style={{
@@ -47,9 +87,14 @@ export default function Navbar({
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Train size={14} color="#b45309" />
-          <span>Mumbai Suburban Railway &bull; Central Line Corridor (CSMT to Kalyan &bull; 26 Stations)</span>
+          <span>Indian Railways &bull; Real OpenStreetMap Geographic Navigation &bull; Mumbai Suburban Network</span>
         </div>
-        <span style={{ color: '#78716c' }}>Live GPS Wayfinding Enabled</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <span style={{ color: currentStation?.hasIndoorMap !== false ? '#059669' : '#b45309', fontWeight: 700 }}>
+            {currentStation?.hasIndoorMap !== false ? '● Level 2: Indoor Mapped' : '○ Level 1: Outdoor OSM'}
+          </span>
+          <span style={{ color: '#78716c' }}>Live GPS Wayfinding Enabled</span>
+        </div>
       </div>
 
       {/* Main Bar */}
@@ -61,7 +106,7 @@ export default function Navbar({
         gap: '1.25rem',
         flexWrap: 'wrap'
       }}>
-        {/* Brand & Central Line Station Selector */}
+        {/* Brand & Real Station Search / Selector */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <div style={{
             width: '40px',
@@ -81,18 +126,143 @@ export default function Navbar({
               <h1 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'inline' }}>
                 SmartRail <span style={{ color: 'var(--accent-cyan)' }}>Navigator</span>
               </h1>
-              <span className="badge badge-cyan" style={{ fontSize: '0.65rem' }}>Central Line</span>
+              <span className="badge badge-cyan" style={{ fontSize: '0.65rem' }}>
+                {currentStation?.zone?.includes('Western') ? 'Western Railway' : 'Central Railway'}
+              </span>
             </div>
 
-            {/* Station Dropdown with accessible label */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
-              <label htmlFor="station-selector" className="sr-only">Select Central Line Railway Station</label>
+            {/* Station Search Input & Selector Container */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.35rem', flexWrap: 'wrap' }}>
+              {/* Real Station Search Input */}
+              <div ref={searchContainerRef} style={{ position: 'relative' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: '#f8fafc',
+                  border: '1.5px solid #cbd5e1',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '0.25rem 0.55rem',
+                  gap: '0.35rem',
+                  width: '230px'
+                }}>
+                  <Search size={14} color="#64748b" />
+                  <input
+                    id="real-station-search-input"
+                    type="search"
+                    value={searchQuery}
+                    placeholder="Search station (e.g. Dadar)..."
+                    aria-label="Search real Indian railway stations"
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setIsSearchOpen(true);
+                    }}
+                    onFocus={() => setIsSearchOpen(true)}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      outline: 'none',
+                      width: '100%',
+                      color: '#0f172a'
+                    }}
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchQuery('');
+                        setIsSearchOpen(false);
+                      }}
+                      style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}
+                      aria-label="Clear station search"
+                    >
+                      <X size={13} color="#94a3b8" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Autocomplete Dropdown */}
+                {isSearchOpen && searchQuery.trim().length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    width: '320px',
+                    maxHeight: '280px',
+                    overflowY: 'auto',
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '8px',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                    zIndex: 100,
+                    marginTop: '4px'
+                  }}>
+                    {searchResults.length === 0 ? (
+                      <div style={{ padding: '0.85rem 1rem', fontSize: '0.8rem', color: '#64748b', textAlign: 'center' }}>
+                        No matching railway stations found.
+                      </div>
+                    ) : (
+                      <div>
+                        <div style={{ padding: '0.4rem 0.75rem', fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                          FOUND {searchResults.length} REAL STATION{searchResults.length > 1 ? 'S' : ''}
+                        </div>
+                        {searchResults.map(stn => (
+                          <div
+                            key={stn.id}
+                            onClick={() => {
+                              onSelectStation(stn.id);
+                              setSearchQuery('');
+                              setIsSearchOpen(false);
+                            }}
+                            style={{
+                              padding: '0.55rem 0.85rem',
+                              borderBottom: '1px solid #f1f5f9',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              background: stn.id === Number(selectedStationId) ? '#f0f9ff' : '#ffffff',
+                              transition: 'background 0.15s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = stn.id === Number(selectedStationId) ? '#f0f9ff' : '#ffffff'}
+                          >
+                            <div>
+                              <div style={{ fontSize: '0.825rem', fontWeight: 800, color: '#0f172a' }}>
+                                {stn.name} <span style={{ color: '#0284c7', fontSize: '0.75rem' }}>({stn.code})</span>
+                              </div>
+                              <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                {stn.city}, {stn.state} &bull; {stn.railwayLines?.join(', ') || stn.zone || 'Indian Railways'}
+                              </div>
+                            </div>
+                            <span style={{
+                              fontSize: '0.65rem',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: stn.hasIndoorMap !== false ? '#ecfdf5' : '#f1f5f9',
+                              color: stn.hasIndoorMap !== false ? '#047857' : '#475569',
+                              fontWeight: 700,
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {stn.hasIndoorMap !== false ? 'Indoor' : 'Outdoor'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Station Dropdown */}
+              <label htmlFor="station-selector" className="sr-only">Select Railway Station</label>
               <select
                 id="station-selector"
                 name="selectedStationId"
                 value={selectedStationId}
                 onChange={(e) => onSelectStation(Number(e.target.value))}
-                aria-label="Select Central Line Railway Station"
+                aria-label="Select Railway Station"
                 style={{
                   background: '#ffffff',
                   border: '1.5px solid #cbd5e1',
@@ -102,18 +272,17 @@ export default function Navbar({
                   fontWeight: 700,
                   padding: '0.3rem 0.65rem',
                   cursor: 'pointer',
-                  maxWidth: '320px',
+                  maxWidth: '280px',
                   boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
                 }}
               >
-                {zones.map(zone => {
-                  const zoneStations = stations.filter(s => s.zone === zone);
-                  if (zoneStations.length === 0) return null;
+                {categories.map(cat => {
+                  if (cat.list.length === 0) return null;
                   return (
-                    <optgroup key={zone} label={zone} style={{ background: '#ffffff', color: '#64748b' }}>
-                      {zoneStations.map(stn => (
+                    <optgroup key={cat.name} label={cat.name} style={{ background: '#ffffff', color: '#64748b' }}>
+                      {cat.list.map(stn => (
                         <option key={stn.id} value={stn.id} style={{ background: '#ffffff', color: '#0f172a' }}>
-                          {stn.name} ({stn.totalPlatforms} Plat)
+                          {stn.name} ({stn.code})
                         </option>
                       ))}
                     </optgroup>

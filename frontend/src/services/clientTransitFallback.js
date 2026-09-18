@@ -4,6 +4,10 @@
  * Ensures the frontend is 100% decoupled from the backend codebase and can run/build independently.
  */
 
+import { REAL_INDIAN_STATIONS } from '../data/realIndianStations.js';
+
+export { REAL_INDIAN_STATIONS };
+
 export const CLIENT_CENTRAL_LINE_STATIONS = [
   { id: 1, code: 'CSMT', name: 'Chhatrapati Shivaji Maharaj Terminus (CSMT)', zone: 'South Mumbai', totalPlatforms: 18, lat: 18.9400, lng: 72.8354, hasMetro: false, hasWesternInterchange: false, hasHarbourInterchange: true, isTerminus: true },
   { id: 2, code: 'MSD', name: 'Masjid Bunder', zone: 'South Mumbai', totalPlatforms: 4, lat: 18.9525, lng: 72.8384, hasMetro: false, hasWesternInterchange: false, hasHarbourInterchange: true },
@@ -66,16 +70,18 @@ export class ClientStationGraph {
 
 export function getClientStationLayout(stationId = 1) {
   const numericId = Number(stationId);
-  const station = CLIENT_CENTRAL_LINE_STATIONS.find(s => s.id === numericId) || CLIENT_CENTRAL_LINE_STATIONS[0];
-  const numPlatforms = station.totalPlatforms;
+  const station = REAL_INDIAN_STATIONS.find(s => s.id === numericId) ||
+                  CLIENT_CENTRAL_LINE_STATIONS.find(s => s.id === numericId) ||
+                  REAL_INDIAN_STATIONS[0];
+  const numPlatforms = station.totalPlatforms || station.platforms?.length || 4;
 
   const nodes = [];
   const edges = [];
   const qrLocations = [];
   const facilities = [];
 
-  const stnLat = station.lat || 18.9400;
-  const stnLng = station.lng || 72.8354;
+  const stnLat = station.latitude || station.lat || 18.9400;
+  const stnLng = station.longitude || station.lng || 72.8354;
 
   const entryEast = { id: `NODE_${station.code}_ENTRY_EAST`, floor_id: 1, name: `${station.name} - East Entrance`, type: 'ENTRANCE', x: 200, y: 530, lat: +(stnLat - 0.0006).toFixed(6), lng: +(stnLng + 0.0004).toFixed(6), accessible: true, icon: '🚪' };
   const entryWest = { id: `NODE_${station.code}_ENTRY_WEST`, floor_id: 1, name: `${station.name} - West Entrance`, type: 'ENTRANCE', x: 600, y: 530, lat: +(stnLat - 0.0006).toFixed(6), lng: +(stnLng - 0.0004).toFixed(6), accessible: true, icon: '🚪' };
@@ -298,11 +304,14 @@ export function bearingToCardinal(deg) {
 }
 
 export function findNearestStation(userLat, userLng) {
-  let nearest = CLIENT_CENTRAL_LINE_STATIONS[0];
+  let nearest = REAL_INDIAN_STATIONS[0];
   let minDistance = Infinity;
 
-  CLIENT_CENTRAL_LINE_STATIONS.forEach(stn => {
-    const dist = haversineDistanceMeters(userLat, userLng, stn.lat, stn.lng);
+  REAL_INDIAN_STATIONS.forEach(stn => {
+    const lat = stn.latitude || stn.lat;
+    const lng = stn.longitude || stn.lng;
+    if (!lat || !lng) return;
+    const dist = haversineDistanceMeters(userLat, userLng, lat, lng);
     if (dist < minDistance) {
       minDistance = dist;
       nearest = stn;

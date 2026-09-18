@@ -23,6 +23,7 @@ import {
   Volume2
 } from 'lucide-react';
 import { calculateBearing, bearingToCardinal } from '../services/clientTransitFallback';
+import { fetchStationOSMFeatures } from '../services/osmOverpassService';
 
 export default function RealStationMap({
   station,
@@ -44,9 +45,13 @@ export default function RealStationMap({
   const routeLayerRef = useRef(null);
   const arrowsLayerRef = useRef(null);
   const railwayOverlayRef = useRef(null);
+  const osmFeaturesLayerRef = useRef(null);
 
   const [activeBaseLayer, setActiveBaseLayer] = useState('roads');
   const [showRailOverlay, setShowRailOverlay] = useState(true);
+  const [showOsmFeatures, setShowOsmFeatures] = useState(false);
+  const [osmFeatures, setOsmFeatures] = useState(null);
+  const [isLoadingOsm, setIsLoadingOsm] = useState(false);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [isSimulatingWalk, setIsSimulatingWalk] = useState(false);
   const [currentZoom, setCurrentZoom] = useState(17);
@@ -232,6 +237,7 @@ export default function RealStationMap({
     routeLayerRef.current = L.layerGroup().addTo(map);
     arrowsLayerRef.current = L.layerGroup().addTo(map);
     markersLayerRef.current = L.layerGroup().addTo(map);
+    osmFeaturesLayerRef.current = L.layerGroup().addTo(map);
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
@@ -295,6 +301,70 @@ export default function RealStationMap({
       setShowRailOverlay(true);
     }
   };
+
+  // Toggle Real OSM Features
+  const handleToggleOsmFeatures = () => {
+    setShowOsmFeatures(prev => !prev);
+  };
+
+  // Fetch verified OSM features dynamically around station
+  useEffect(() => {
+    if (!showOsmFeatures || !station) return;
+    const lat = station.latitude || station.lat || 18.9400;
+    const lng = station.longitude || station.lng || 72.8354;
+    setIsLoadingOsm(true);
+    fetchStationOSMFeatures(lat, lng).then(data => {
+      setOsmFeatures(data);
+      setIsLoadingOsm(false);
+    }).catch(err => {
+      console.warn('[RealStationMap] Failed to load OSM features:', err);
+      setIsLoadingOsm(false);
+    });
+  }, [showOsmFeatures, station?.id]);
+
+  // Render verified OSM platform and amenity markers
+  useEffect(() => {
+    if (!mapInstanceRef.current || !osmFeaturesLayerRef.current) return;
+    osmFeaturesLayerRef.current.clearLayers();
+    if (!showOsmFeatures || !osmFeatures || !osmFeatures.success) return;
+
+    // Verified OSM Amenities
+    (osmFeatures.amenities || []).forEach(amen => {
+      const icon = amen.type === 'toilets' ? '🚻' : amen.type === 'drinking_water' ? '🚰' : '☕';
+      const marker = L.marker([amen.lat, amen.lng], {
+        icon: L.divIcon({
+          className: 'osm-amenity-pin',
+          html: `
+            <div style="background: #ffffff; border: 1.5px solid #0284c7; color: #0369a1; font-weight: 700; font-size: 10px; padding: 2px 6px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.15); white-space: nowrap; display: flex; align-items: center; gap: 3px;">
+              <span>${icon}</span> <span>${amen.name}</span> <span style="font-size: 8px; background: #e0f2fe; color: #0284c7; padding: 1px 4px; border-radius: 3px;">OSM</span>
+            </div>
+          `,
+          iconSize: [28, 20],
+          iconAnchor: [14, 10]
+        })
+      });
+      marker.bindPopup(`<strong>${amen.name}</strong><br><span style="font-size: 11px; color: #64748b;">Verified OpenStreetMap Node #${amen.osmId}</span>`);
+      marker.addTo(osmFeaturesLayerRef.current);
+    });
+
+    // Verified OSM Platforms
+    (osmFeatures.platforms || []).forEach(plat => {
+      const marker = L.marker([plat.lat, plat.lng], {
+        icon: L.divIcon({
+          className: 'osm-platform-pin',
+          html: `
+            <div style="background: #ecfdf5; border: 1.5px solid #059669; color: #047857; font-weight: 800; font-size: 10px; padding: 2px 6px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.15); white-space: nowrap; display: flex; align-items: center; gap: 3px;">
+              <span>🚆</span> <span>${plat.name}</span> <span style="font-size: 8px; background: #d1fae5; color: #047857; padding: 1px 4px; border-radius: 3px;">OSM</span>
+            </div>
+          `,
+          iconSize: [28, 20],
+          iconAnchor: [14, 10]
+        })
+      });
+      marker.bindPopup(`<strong>${plat.name}</strong><br><span style="font-size: 11px; color: #64748b;">Verified OpenStreetMap Platform #${plat.osmId}</span>`);
+      marker.addTo(osmFeaturesLayerRef.current);
+    });
+  }, [showOsmFeatures, osmFeatures]);
 
   // Render Google Maps style pins, GPS blue dot, and platform markers
   useEffect(() => {
@@ -460,7 +530,7 @@ export default function RealStationMap({
     routeLayerRef.current.clearLayers();
     arrowsLayerRef.current.clearLayers();
 
-    if (calculatedRoute && calculatedRoute.route && calculatedRoute.route.length > 1) {
+    if (calculatedRoute && calculatedRoute.success && calculatedRoute.route && calculatedRoute.route.length > 1) {
       const validNodes = calculatedRoute.route.filter(n => n.lat && n.lng);
       const latlngs = validNodes.map(n => [n.lat, n.lng]);
 
@@ -474,14 +544,12 @@ export default function RealStationMap({
           lineCap: 'round'
         });
 
-        // Main Route line (Solid line for real highway drive, dashed for walking)
+        // Main Route line: Solid pedestrian path along real street/walkway geometry
         const routeColor = accessibleMode ? '#059669' : '#1a73e8';
-        const isHighway = calculatedRoute.isLongDistance;
         const mainRoute = L.polyline(latlngs, {
           color: routeColor,
-          weight: isHighway ? 6 : 5,
-          opacity: 1,
-          dashArray: isHighway ? null : '3, 8',
+          weight: 6,
+          opacity: 0.95,
           lineJoin: 'round',
           lineCap: 'round'
         });
@@ -516,7 +584,7 @@ export default function RealStationMap({
 
         // Waypoint step badges (rendered only for key turning points, not high-density road samples)
         validNodes.forEach((n, idx) => {
-          if (idx === 0 || idx === validNodes.length - 1 || n.isRoad) return;
+          if (idx === 0 || idx === validNodes.length - 1 || n.isRoad || n.isPedestrianPath) return;
           const isActiveStep = activeStepIndex === idx;
 
           const stepIcon = L.divIcon({
@@ -616,16 +684,27 @@ export default function RealStationMap({
       {/* Top Header & Layer Controls */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.65rem' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
             <span className="badge badge-cyan" style={{ background: '#e8f0fe', color: '#1a73e8', border: '1px solid #c2e7ff' }}>
               {station?.code || 'CSMT'}
             </span>
-            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
               {station?.name || 'Chhatrapati Shivaji Maharaj Terminus'}
             </h2>
+            {station?.hasIndoorMap === false ? (
+              <span style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '12px' }}>
+                Level 1: Outdoor OSM
+              </span>
+            ) : (
+              <span style={{ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '12px' }}>
+                Level 2: Indoor Mapped
+              </span>
+            )}
           </div>
-          <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.1rem' }}>
-            {isGpsActive ? '📍 Real GPS Mode Active &bull; Turn directions & compass headings synced' : 'Live Google Maps walking navigation showing turn directions and platform tracks'}
+          <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span>📍 Real Location: {((station?.latitude || station?.lat || 18.9400)).toFixed(4)}° N, {((station?.longitude || station?.lng || 72.8354)).toFixed(4)}° E</span>
+            <span>&bull;</span>
+            <span>{isGpsActive ? 'Live GPS Navigation Synced' : 'Pedestrian Routing on Real Roads & Paths'}</span>
           </p>
         </div>
 
@@ -715,6 +794,28 @@ export default function RealStationMap({
 
             <button
               type="button"
+              onClick={handleToggleOsmFeatures}
+              style={{
+                padding: '0.3rem 0.65rem',
+                borderRadius: 'var(--radius-sm)',
+                border: showOsmFeatures ? '1px solid #0284c7' : '1px solid transparent',
+                background: showOsmFeatures ? '#e0f2fe' : 'transparent',
+                color: showOsmFeatures ? '#0284c7' : '#475569',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.2rem'
+              }}
+              title="Show verified OpenStreetMap platform and amenity nodes"
+            >
+              <span>🏛️</span>
+              <span>{isLoadingOsm ? 'Loading...' : showOsmFeatures ? 'OSM: ON' : 'OSM Points'}</span>
+            </button>
+
+            <button
+              type="button"
               onClick={handleRecenterStation}
               style={{
                 padding: '0.3rem 0.55rem',
@@ -738,12 +839,57 @@ export default function RealStationMap({
         </div>
       </div>
 
+      {/* Level 1 Indoor Map Notice if indoor data is not mapped */}
+      {station?.hasIndoorMap === false && (
+        <div style={{
+          background: '#fffbeb',
+          border: '1.5px solid #fef3c7',
+          borderRadius: 'var(--radius-sm)',
+          padding: '0.45rem 0.85rem',
+          fontSize: '0.78rem',
+          color: '#b45309',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.4rem'
+        }}>
+          <span>ℹ️</span>
+          <span>
+            <strong>Detailed indoor map data is not available for this station.</strong> Navigating to verified station entrance via OpenStreetMap pedestrian network.
+          </span>
+        </div>
+      )}
+
       {/* Map Container with Floating Google Maps Live Turn-by-Turn HUD */}
       <div style={{ position: 'relative', width: '100%', height: '540px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid #cbd5e1' }}>
         <div
           ref={mapContainerRef}
           style={{ width: '100%', height: '100%', background: '#e5e3df' }}
         />
+
+        {/* Failure State: No Pedestrian Route Available */}
+        {calculatedRoute && !calculatedRoute.success && (
+          <div style={{
+            position: 'absolute',
+            top: '16px',
+            left: '16px',
+            zIndex: 20,
+            background: '#ffffff',
+            border: '1.5px solid #ef4444',
+            borderRadius: '12px',
+            padding: '1rem 1.25rem',
+            boxShadow: '0 10px 30px rgba(239, 68, 68, 0.2)',
+            maxWidth: '440px',
+            width: 'calc(100% - 32px)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#b91c1c', fontWeight: 800, fontSize: '0.95rem' }}>
+              <span>⚠️</span>
+              <span>No pedestrian route available.</span>
+            </div>
+            <div style={{ fontSize: '0.78rem', color: '#475569', marginTop: '0.35rem', lineHeight: '1.4' }}>
+              The routing engine could not find a safe pedestrian route avoiding railway tracks from this location to the station entrance. Please select a starting point on public roads or footpaths with safe railway crossings.
+            </div>
+          </div>
+        )}
 
         {/* Floating Google Maps Live Turn-by-Turn Navigation HUD Card */}
         {calculatedRoute && calculatedRoute.success && (
@@ -763,7 +909,7 @@ export default function RealStationMap({
           }}>
             {/* Top Navigation Banner */}
             <div style={{
-              background: accessibleMode ? '#047857' : (calculatedRoute.isLongDistance ? '#0369a1' : '#1a73e8'),
+              background: accessibleMode ? '#047857' : '#1a73e8',
               color: '#ffffff',
               padding: '0.85rem 1rem',
               display: 'flex',
@@ -828,20 +974,18 @@ export default function RealStationMap({
 
             {/* Bottom Controls & Step Progression Carousel */}
             <div style={{ padding: '0.65rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', background: '#ffffff', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                {calculatedRoute.isLongDistance ? (
-                  <span style={{ fontSize: '15px' }}>🚗</span>
-                ) : (
-                  <Footprints size={15} color="#1a73e8" />
-                )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <Footprints size={15} color="#1a73e8" />
                 <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
-                  {Math.ceil(calculatedRoute.estimatedTime / 60)} min
+                  {Math.max(1, Math.ceil(calculatedRoute.estimatedTime / 60))} min
                 </span>
                 <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                  ({calculatedRoute.distance >= 1000 ? `${(calculatedRoute.distance / 1000).toFixed(1)} km` : `${calculatedRoute.distance} m`})
+                  ({calculatedRoute.distance >= 1000 ? `${(calculatedRoute.distance / 1000).toFixed(2)} km` : `${calculatedRoute.distance} m`})
                 </span>
-                {calculatedRoute.isLongDistance && (
-                  <span className="badge badge-cyan" style={{ fontSize: '0.65rem' }}>Highway Drive</span>
+                {calculatedRoute.level === 1 && (
+                  <span className="badge badge-amber" style={{ fontSize: '0.65rem', background: '#fef3c7', color: '#b45309' }}>
+                    Outdoor OSM
+                  </span>
                 )}
               </div>
 

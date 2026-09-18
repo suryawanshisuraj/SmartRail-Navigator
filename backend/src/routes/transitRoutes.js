@@ -2,6 +2,8 @@ import express from 'express';
 import {
   getStations,
   getStationById,
+  searchStations,
+  getStationOsmFeatures,
   getFacilities,
   postQRScan,
   postCalculateRoute,
@@ -14,8 +16,10 @@ import {
 export function createTransitRouter() {
   const router = express.Router();
 
-  // Stations
+  // Stations & Real Geographic Search
+  router.get('/stations/search', searchStations);
   router.get('/stations', getStations);
+  router.get('/stations/:stationId/osm-features', getStationOsmFeatures);
   router.get('/stations/:stationId', getStationById);
   router.get('/stations/:stationId/facilities', getFacilities);
 

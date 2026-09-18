@@ -39,6 +39,7 @@ export default function App() {
   const [realGpsPosition, setRealGpsPosition] = useState(null);
   const [isGpsActive, setIsGpsActive] = useState(false);
   const [isGpsLoading, setIsGpsLoading] = useState(false);
+  const [gpsError, setGpsError] = useState(null);
   const [gpsDistanceNotice, setGpsDistanceNotice] = useState(null);
 
   // Load Station Data
@@ -206,9 +207,11 @@ export default function App() {
       const destNode = targetStationData?.nodes.find(n => n.id === targetDest);
       const modeLabel = res?.isLongDistance ? 'highway road route' : 'pedestrian wayfinding';
       setAnnouncement(`GPS Locked! Accuracy ±${pos.accuracy}m. Real ${modeLabel} ready to ${destNode?.name || 'Platform'}.`);
+      setGpsError(null);
     } catch (err) {
       console.error('GPS error:', err);
-      setAnnouncement(`Location status: ${err.message || 'Could not obtain device location. Please check browser location permissions.'}`);
+      setGpsError('Unable to determine your current location. Select starting location manually.');
+      setAnnouncement('Unable to determine your current location. Select starting location manually.');
       setIsGpsActive(false);
     } finally {
       setIsGpsLoading(false);
@@ -290,6 +293,78 @@ export default function App() {
           <div className="main-dashboard-grid">
             {/* Left Column: Real Geographic Station Map & Floorplan Switcher */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {/* GPS Unavailable / Permission Denied Notification Banner */}
+              {gpsError && (
+                <div
+                  id="gps-error-notice"
+                  role="alert"
+                  style={{
+                    background: '#fff1f2',
+                    border: '1.5px solid #fecdd3',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '0.85rem 1.25rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '1rem',
+                    flexWrap: 'wrap',
+                    boxShadow: '0 2px 8px rgba(225, 29, 72, 0.08)'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{ fontSize: '1.4rem' }}>⚠️</span>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#9f1239' }}>
+                        Unable to determine your current location.
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#881337', marginTop: '0.15rem' }}>
+                        Select starting location manually.
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <label htmlFor="manual-start-location-select" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#4c0519' }}>
+                      Start Location:
+                    </label>
+                    <select
+                      id="manual-start-location-select"
+                      className="form-select"
+                      style={{
+                        padding: '0.35rem 0.65rem',
+                        fontSize: '0.78rem',
+                        borderRadius: '6px',
+                        border: '1px solid #f43f5e',
+                        background: '#ffffff',
+                        color: '#1e293b'
+                      }}
+                      value={currentLocationNode?.id || ''}
+                      onChange={(e) => {
+                        const selected = stationData?.nodes?.find(n => n.id === e.target.value);
+                        if (selected) {
+                          handleLocationDetected(selected);
+                          setGpsError(null);
+                        }
+                      }}
+                    >
+                      <option value="" disabled>Select starting location manually</option>
+                      {stationData?.nodes?.filter(n => n.type === 'ENTRANCE' || n.type === 'PLATFORM' || n.type === 'FACILITY')?.map(n => (
+                        <option key={n.id} value={n.id}>
+                          {n.name} ({n.type})
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem' }}
+                      onClick={() => setGpsError(null)}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* GPS Long-Distance Route Notification Banner */}
               {gpsDistanceNotice && gpsDistanceNotice.isFar && isGpsActive && (
                 <div style={{
