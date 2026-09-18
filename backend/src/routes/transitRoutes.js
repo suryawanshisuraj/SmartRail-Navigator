@@ -6,7 +6,9 @@ import {
   postQRScan,
   postCalculateRoute,
   postAIChat,
-  getStationUpdates
+  getStationUpdates,
+  postRouteSearch,
+  postCalculateFare
 } from '../controllers/transitController.js';
 
 export function createTransitRouter() {
@@ -20,6 +22,10 @@ export function createTransitRouter() {
   // QR & Navigation
   router.post('/navigation/qr-scan', postQRScan);
   router.post('/navigation/route', postCalculateRoute);
+  router.post('/routes/search', postRouteSearch);
+
+  // Fare calculation
+  router.post('/fare/calculate', postCalculateFare);
 
   // AI Assistant
   router.post('/ai/chat', postAIChat);

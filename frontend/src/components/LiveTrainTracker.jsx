@@ -31,18 +31,18 @@ export default function LiveTrainTracker({ liveUpdates }) {
   const active = trains.find(t => t.id === selectedTrain) || trains[0];
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 380px) 1fr', gap: '2rem', alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: '1.5rem', alignItems: 'start' }}>
       {/* Train Fleet Selector */}
-      <div className="glass-panel" style={{ padding: '1.5rem' }}>
+      <div className="glass-panel" style={{ padding: '1.5rem', background: '#ffffff' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#0f172a' }}>
             <Radio size={20} color="var(--accent-cyan)" />
             <span>Active Rail Fleet</span>
           </h2>
           <span className="badge badge-cyan">{trains.length} Online</span>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }} role="group" aria-label="Select Active Train">
           {trains.map(train => {
             const isSelected = train.id === selectedTrain;
             const isDelayed = train.delayMinutes > 0;
@@ -51,6 +51,7 @@ export default function LiveTrainTracker({ liveUpdates }) {
                 key={train.id}
                 type="button"
                 onClick={() => setSelectedTrain(train.id)}
+                aria-pressed={isSelected}
                 style={{
                   display: 'flex',
                   alignItems: 'center',

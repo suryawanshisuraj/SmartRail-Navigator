@@ -168,6 +168,8 @@ export default function NavigationPanel({
         </label>
         <select
           id="platform-dest-select"
+          name="platformDestination"
+          aria-label="Select station platform or amenity destination"
           value={selectedDestinationId}
           onChange={(e) => {
             setSelectedDestinationId(e.target.value);
@@ -337,9 +339,9 @@ export default function NavigationPanel({
                       <div style={{ fontWeight: 700, lineHeight: '1.3' }}>
                         {m.instruction}
                       </div>
-                      {m.cardinal && m.distance > 0 && (
+                      {m.distance > 0 && (
                         <div style={{ fontSize: '0.68rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                          <span>Heading: {m.cardinal}</span>
+                          <span>Heading: {m.cardinal || 'Forward'} ({Math.round(m.bearing || 0)}°)</span>
                           <span>&bull;</span>
                           <span>{m.distance}m</span>
                         </div>

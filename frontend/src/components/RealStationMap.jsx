@@ -193,11 +193,10 @@ export default function RealStationMap({
       zoomControl: false
     });
 
-    // 1. Google Maps style Street & Road tiles (CartoDB Voyager)
-    const roadsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      maxZoom: 20,
-      subdomains: 'abcd',
-      attribution: '&copy; OpenStreetMap &copy; CARTO'
+    // 1. Street & Road tiles (Clean OpenStreetMap Standard - No watermark)
+    const roadsLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
     });
 
     // 2. Real Aerial Satellite View
@@ -206,10 +205,10 @@ export default function RealStationMap({
       attribution: 'Tiles &copy; Esri'
     });
 
-    // 3. OpenStreetMap
-    const osmLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // 3. ESRI World Street Map (Alternative high-detail view)
+    const osmLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors'
+      attribution: 'Tiles &copy; Esri'
     });
 
     // 4. OpenRailwayMap tracks overlay
@@ -779,7 +778,7 @@ export default function RealStationMap({
                     {activeManeuver?.instruction || `Head to ${destinationNode?.name}`}
                   </div>
                   <div style={{ fontSize: '0.72rem', opacity: 0.9, display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.15rem' }}>
-                    <span>🧭 Heading {activeManeuver?.bearing || 0}° {activeManeuver?.cardinal || ''}</span>
+                    <span>🧭 Heading {Math.round(activeManeuver?.bearing || 0)}° {activeManeuver?.cardinal || bearingToCardinal(activeManeuver?.bearing || 0)}</span>
                     {activeManeuver?.distance > 0 && (
                       <>
                         <span>&bull;</span>

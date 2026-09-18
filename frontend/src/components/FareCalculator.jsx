@@ -21,7 +21,7 @@ export default function FareCalculator({ initialDistanceKm = 45 }) {
   }, [distanceKm, travelClass, isOffPeak, passengerType]);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: '2rem', alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 360px), 1fr))', gap: '1.5rem', alignItems: 'start' }}>
       {/* Fare Configuration Form */}
       <div className="glass-panel" style={{ padding: '2rem' }}>
         <h2 style={{ fontSize: '1.25rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.5rem' }}>
@@ -33,7 +33,7 @@ export default function FareCalculator({ initialDistanceKm = 45 }) {
           {/* Distance Slider */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <label htmlFor="fare-distance-slider" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
                 TRAVEL DISTANCE
               </label>
               <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-cyan)' }}>
@@ -41,6 +41,9 @@ export default function FareCalculator({ initialDistanceKm = 45 }) {
               </span>
             </div>
             <input
+              id="fare-distance-slider"
+              name="distanceKm"
+              aria-label="Travel distance in kilometers"
               type="range"
               min="5"
               max="250"
@@ -56,7 +59,7 @@ export default function FareCalculator({ initialDistanceKm = 45 }) {
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
               CABIN CLASS
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }} role="group" aria-label="Select Cabin Class">
               {[
                 { id: 'STANDARD', label: 'Standard', desc: '1.0x Base' },
                 { id: 'BUSINESS', label: 'Business', desc: '1.6x Base' },
@@ -66,6 +69,7 @@ export default function FareCalculator({ initialDistanceKm = 45 }) {
                   key={c.id}
                   type="button"
                   onClick={() => setTravelClass(c.id)}
+                  aria-pressed={travelClass === c.id}
                   style={{
                     padding: '0.85rem',
                     borderRadius: 'var(--radius-md)',
@@ -85,8 +89,10 @@ export default function FareCalculator({ initialDistanceKm = 45 }) {
 
           {/* Off-Peak and Discount Toggles */}
           <div style={{ display: 'flex', gap: '1rem', background: 'rgba(255, 255, 255, 0.02)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-glass)' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+            <label htmlFor="fare-offpeak-checkbox" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontSize: '0.85rem' }}>
               <input
+                id="fare-offpeak-checkbox"
+                name="isOffPeak"
                 type="checkbox"
                 checked={isOffPeak}
                 onChange={(e) => setIsOffPeak(e.target.checked)}
@@ -105,26 +111,26 @@ export default function FareCalculator({ initialDistanceKm = 45 }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>Base Boarding Fare:</span>
-                  <span style={{ fontFamily: 'var(--font-mono)' }}>${fareData.basePrice.toFixed(2)}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)' }}>₹{fareData.basePrice.toFixed(2)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>Distance Charge ({distanceKm} km):</span>
-                  <span style={{ fontFamily: 'var(--font-mono)' }}>${fareData.distanceCharge.toFixed(2)}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)' }}>₹{fareData.distanceCharge.toFixed(2)}</span>
                 </div>
                 {fareData.discountApplied > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#34d399' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669' }}>
                     <span>Discounts Applied:</span>
-                    <span style={{ fontFamily: 'var(--font-mono)' }}>-${fareData.discountApplied.toFixed(2)}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)' }}>-₹{fareData.discountApplied.toFixed(2)}</span>
                   </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>Taxes & Regional Rail Surcharge (8%):</span>
-                  <span style={{ fontFamily: 'var(--font-mono)' }}>${fareData.tax.toFixed(2)}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)' }}>₹{fareData.tax.toFixed(2)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-primary)', borderTop: '1px solid var(--border-glass)', paddingTop: '0.6rem', marginTop: '0.4rem' }}>
                   <span>Total Payable:</span>
                   <span style={{ color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>
-                    ${fareData.totalFare.toFixed(2)}
+                    ₹{fareData.totalFare.toFixed(2)}
                   </span>
                 </div>
               </div>

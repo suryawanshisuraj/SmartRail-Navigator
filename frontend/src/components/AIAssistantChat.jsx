@@ -159,7 +159,13 @@ export default function AIAssistantChat({ onTriggerAction }) {
         onSubmit={(e) => { e.preventDefault(); handleSend(); }}
         style={{ padding: '1.25rem 1.5rem', display: 'flex', gap: '0.75rem', background: 'rgba(15, 23, 42, 0.8)' }}
       >
+        <label htmlFor="chat-assistant-query" className="sr-only">
+          Ask Transit Assistant Query
+        </label>
         <input
+          id="chat-assistant-query"
+          name="chatQuery"
+          aria-label="Ask transit AI assistant question"
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}

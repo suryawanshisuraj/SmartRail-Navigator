@@ -5,6 +5,9 @@ import StationMap2D from './components/StationMap2D';
 import NavigationPanel from './components/NavigationPanel';
 import AIAssistantDrawer from './components/AIAssistantDrawer';
 import QRLocationScanner from './components/QRLocationScanner';
+import RouteSearch from './components/RouteSearch';
+import LiveTrainTracker from './components/LiveTrainTracker';
+import FareCalculator from './components/FareCalculator';
 import { Map, Layers } from 'lucide-react';
 import {
   fetchStationList,
@@ -16,6 +19,7 @@ import {
 } from './services/transitService';
 
 export default function App() {
+  const [activeTab, setActiveTab] = useState('WAYFINDING'); // 'WAYFINDING', 'PLANNER', 'TRAINS', 'FARES'
   const [stations, setStations] = useState([]);
   const [selectedStationId, setSelectedStationId] = useState(1);
   const [stationData, setStationData] = useState(null);
@@ -250,145 +254,169 @@ export default function App() {
         onDetectRealLocation={handleDetectRealLocation}
         isGpsActive={isGpsActive}
         isGpsLoading={isGpsLoading}
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
       />
 
       {/* Main Dashboard Workspace */}
-      <main style={{
+      <main className="responsive-main-container" style={{
         flex: 1,
         padding: '1.25rem 2rem',
         maxWidth: '1600px',
         width: '100%',
-        margin: '0 auto',
-        display: 'grid',
-        gridTemplateColumns: 'minmax(520px, 1.25fr) minmax(380px, 0.75fr)',
-        gap: '1.5rem',
-        alignItems: 'start'
+        margin: '0 auto'
       }}>
-        {/* Left Column: Real Geographic Station Map & Floorplan Switcher */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-          {/* Map Mode Tab Switcher */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: '#ffffff',
-            padding: '0.4rem 0.65rem',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--border-glass)',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-          }}>
-            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
-              STATION MAP VIEW
-            </span>
+        {activeTab === 'WAYFINDING' && (
+          <div className="main-dashboard-grid">
+            {/* Left Column: Real Geographic Station Map & Floorplan Switcher */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {/* Map Mode Tab Switcher */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: '#ffffff',
+                padding: '0.4rem 0.65rem',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-glass)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+              }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                  STATION MAP VIEW
+                </span>
 
-            <div style={{ display: 'flex', gap: '0.35rem' }}>
-              <button
-                type="button"
-                onClick={() => setMapViewMode('REAL_MAP')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  padding: '0.35rem 0.85rem',
-                  borderRadius: 'var(--radius-sm)',
-                  border: mapViewMode === 'REAL_MAP' ? '1.5px solid #1a73e8' : '1px solid transparent',
-                  background: mapViewMode === 'REAL_MAP' ? '#e8f0fe' : 'transparent',
-                  color: mapViewMode === 'REAL_MAP' ? '#1a73e8' : 'var(--text-secondary)',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >
-                <Map size={14} color={mapViewMode === 'REAL_MAP' ? '#1a73e8' : 'currentColor'} />
-                <span>🗺️ Real Road Map (Google Maps Style)</span>
-              </button>
+                <div style={{ display: 'flex', gap: '0.35rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setMapViewMode('REAL_MAP')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      padding: '0.35rem 0.85rem',
+                      borderRadius: 'var(--radius-sm)',
+                      border: mapViewMode === 'REAL_MAP' ? '1.5px solid #1a73e8' : '1px solid transparent',
+                      background: mapViewMode === 'REAL_MAP' ? '#e8f0fe' : 'transparent',
+                      color: mapViewMode === 'REAL_MAP' ? '#1a73e8' : 'var(--text-secondary)',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Map size={14} color={mapViewMode === 'REAL_MAP' ? '#1a73e8' : 'currentColor'} />
+                    <span>🗺️ Real Road Map (Google Maps Style)</span>
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => setMapViewMode('SCHEMATIC')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  padding: '0.35rem 0.85rem',
-                  borderRadius: 'var(--radius-sm)',
-                  border: mapViewMode === 'SCHEMATIC' ? '1.5px solid #1a73e8' : '1px solid transparent',
-                  background: mapViewMode === 'SCHEMATIC' ? '#e8f0fe' : 'transparent',
-                  color: mapViewMode === 'SCHEMATIC' ? '#1a73e8' : 'var(--text-secondary)',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >
-                <Layers size={14} color={mapViewMode === 'SCHEMATIC' ? '#1a73e8' : 'currentColor'} />
-                <span>📐 Indoor Station Blueprint (Concourse / FOB)</span>
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => setMapViewMode('SCHEMATIC')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      padding: '0.35rem 0.85rem',
+                      borderRadius: 'var(--radius-sm)',
+                      border: mapViewMode === 'SCHEMATIC' ? '1.5px solid #1a73e8' : '1px solid transparent',
+                      background: mapViewMode === 'SCHEMATIC' ? '#e8f0fe' : 'transparent',
+                      color: mapViewMode === 'SCHEMATIC' ? '#1a73e8' : 'var(--text-secondary)',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Layers size={14} color={mapViewMode === 'SCHEMATIC' ? '#1a73e8' : 'currentColor'} />
+                    <span>📐 Indoor Station Blueprint (Concourse / FOB)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Active Map View */}
+              {mapViewMode === 'REAL_MAP' ? (
+                <RealStationMap
+                  station={stationData}
+                  nodes={stationData?.nodes || []}
+                  currentLocationNode={currentLocationNode}
+                  destinationNode={destinationNode}
+                  calculatedRoute={calculatedRoute}
+                  accessibleMode={accessibleMode}
+                  realGpsPosition={realGpsPosition}
+                  onDetectRealLocation={handleDetectRealLocation}
+                  isGpsActive={isGpsActive}
+                  isGpsLoading={isGpsLoading}
+                  onNodeClick={(node) => {
+                    setSelectedDestinationId(node.id);
+                    handleCalculateRoute(node.id, routeType);
+                  }}
+                />
+              ) : (
+                <StationMap2D
+                  station={stationData}
+                  nodes={stationData?.nodes || []}
+                  currentLocationNode={currentLocationNode}
+                  destinationNode={destinationNode}
+                  calculatedRoute={calculatedRoute}
+                  accessibleMode={accessibleMode}
+                  activeFloor={activeFloor}
+                  setActiveFloor={setActiveFloor}
+                  onNodeClick={(node) => {
+                    setSelectedDestinationId(node.id);
+                    handleCalculateRoute(node.id, routeType);
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Right Column: Navigation Controls & Grounded AI Assistant */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <NavigationPanel
+                station={stationData}
+                destinations={destinations}
+                selectedDestinationId={selectedDestinationId}
+                setSelectedDestinationId={setSelectedDestinationId}
+                routeType={routeType}
+                setRouteType={setRouteType}
+                calculatedRoute={calculatedRoute}
+                onCalculateRoute={handleCalculateRoute}
+                language={language}
+                accessibleMode={accessibleMode}
+                currentLocationNode={currentLocationNode}
+                onDetectRealLocation={handleDetectRealLocation}
+                isGpsActive={isGpsActive}
+                isGpsLoading={isGpsLoading}
+                realGpsPosition={realGpsPosition}
+              />
+
+              <AIAssistantDrawer
+                station={stationData}
+                currentLocationNode={currentLocationNode}
+                accessibleMode={accessibleMode}
+                onApplyAIRoute={handleApplyAIRoute}
+              />
             </div>
           </div>
+        )}
 
-          {/* Active Map View */}
-          {mapViewMode === 'REAL_MAP' ? (
-            <RealStationMap
-              station={stationData}
-              nodes={stationData?.nodes || []}
-              currentLocationNode={currentLocationNode}
-              destinationNode={destinationNode}
-              calculatedRoute={calculatedRoute}
-              accessibleMode={accessibleMode}
-              realGpsPosition={realGpsPosition}
-              onDetectRealLocation={handleDetectRealLocation}
-              isGpsActive={isGpsActive}
-              isGpsLoading={isGpsLoading}
-              onNodeClick={(node) => {
-                setSelectedDestinationId(node.id);
-                handleCalculateRoute(node.id, routeType);
-              }}
-            />
-          ) : (
-            <StationMap2D
-              station={stationData}
-              nodes={stationData?.nodes || []}
-              currentLocationNode={currentLocationNode}
-              destinationNode={destinationNode}
-              calculatedRoute={calculatedRoute}
-              accessibleMode={accessibleMode}
-              activeFloor={activeFloor}
-              setActiveFloor={setActiveFloor}
-              onNodeClick={(node) => {
-                setSelectedDestinationId(node.id);
-                handleCalculateRoute(node.id, routeType);
-              }}
-            />
-          )}
-        </div>
-
-        {/* Right Column: Navigation Controls & Grounded AI Assistant */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <NavigationPanel
-            station={stationData}
-            destinations={destinations}
-            selectedDestinationId={selectedDestinationId}
-            setSelectedDestinationId={setSelectedDestinationId}
-            routeType={routeType}
-            setRouteType={setRouteType}
-            calculatedRoute={calculatedRoute}
-            onCalculateRoute={handleCalculateRoute}
-            language={language}
+        {activeTab === 'PLANNER' && (
+          <RouteSearch
+            stations={stations}
             accessibleMode={accessibleMode}
-            currentLocationNode={currentLocationNode}
-            onDetectRealLocation={handleDetectRealLocation}
-            isGpsActive={isGpsActive}
-            isGpsLoading={isGpsLoading}
-            realGpsPosition={realGpsPosition}
+            onSelectStationForMap={(stnId) => {
+              setSelectedStationId(stnId);
+              setActiveTab('WAYFINDING');
+            }}
+            onSelectLegForFare={(distKm) => {
+              setActiveTab('FARES');
+            }}
           />
+        )}
 
-          <AIAssistantDrawer
-            station={stationData}
-            currentLocationNode={currentLocationNode}
-            accessibleMode={accessibleMode}
-            onApplyAIRoute={handleApplyAIRoute}
-          />
-        </div>
+        {activeTab === 'TRAINS' && (
+          <LiveTrainTracker />
+        )}
+
+        {activeTab === 'FARES' && (
+          <FareCalculator />
+        )}
       </main>
 
       {/* QR Location Scanner Modal */}

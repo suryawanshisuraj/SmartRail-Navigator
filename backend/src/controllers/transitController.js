@@ -473,3 +473,113 @@ export function getStationUpdates(req, res) {
     ]
   });
 }
+
+/**
+ * POST /api/routes/search
+ */
+export function postRouteSearch(req, res) {
+  const { origin, destination, options = {} } = req.body || {};
+  if (!origin || !destination) {
+    return res.status(400).json({ success: false, error: 'Both origin and destination stations are required.' });
+  }
+
+  const originStn = MUMBAI_CENTRAL_LINE_STATIONS.find(s => s.id === Number(origin) || s.code === String(origin).toUpperCase() || s.name.toLowerCase().includes(String(origin).toLowerCase()));
+  const destStn = MUMBAI_CENTRAL_LINE_STATIONS.find(s => s.id === Number(destination) || s.code === String(destination).toUpperCase() || s.name.toLowerCase().includes(String(destination).toLowerCase()));
+
+  if (!originStn || !destStn) {
+    return res.status(404).json({ success: false, error: 'Origin or destination station not found on Mumbai Central Line.' });
+  }
+
+  const originIdx = MUMBAI_CENTRAL_LINE_STATIONS.findIndex(s => s.id === originStn.id);
+  const destIdx = MUMBAI_CENTRAL_LINE_STATIONS.findIndex(s => s.id === destStn.id);
+  const numStops = Math.abs(destIdx - originIdx);
+  const distanceKm = Math.max(2, numStops * 2.3);
+  const isFast = options.preference === 'fastest' && numStops > 5;
+  const durationMinutes = Math.round(isFast ? numStops * 1.8 + 4 : numStops * 2.6 + 2);
+
+  const direction = destIdx > originIdx ? 'Down (towards Kalyan)' : 'Up (towards CSMT)';
+  const trainType = isFast ? 'Fast Suburban Local' : 'All-Stops Slow Local';
+
+  // Calculate realistic Mumbai suburban fare
+  let estimatedFare = 5.0;
+  if (distanceKm > 10 && distanceKm <= 20) estimatedFare = 10.0;
+  else if (distanceKm > 20 && distanceKm <= 35) estimatedFare = 15.0;
+  else if (distanceKm > 35 && distanceKm <= 50) estimatedFare = 20.0;
+  else if (distanceKm > 50) estimatedFare = 25.0;
+
+  const intermediateStations = [];
+  const step = destIdx > originIdx ? 1 : -1;
+  for (let i = originIdx + step; i !== destIdx; i += step) {
+    intermediateStations.push(MUMBAI_CENTRAL_LINE_STATIONS[i]);
+  }
+
+  const legs = [
+    {
+      type: 'BOARDING',
+      station: originStn,
+      instruction: `Board ${trainType} ${direction} from Platform 1/2.`,
+      scheduledDeparture: '3 mins'
+    },
+    {
+      type: 'TRANSIT',
+      trainType,
+      direction,
+      stopsCount: numStops,
+      intermediateStations: intermediateStations.map(s => s.name),
+      durationMinutes
+    },
+    {
+      type: 'ALIGHTING',
+      station: destStn,
+      instruction: `Arrive at ${destStn.name} Platform 1/2. Total journey distance: ${distanceKm.toFixed(1)} km.`
+    }
+  ];
+
+  res.json({
+    success: true,
+    itinerary: {
+      origin: originStn,
+      destination: destStn,
+      totalDurationMinutes: durationMinutes,
+      distanceKm: +distanceKm.toFixed(1),
+      estimatedFare,
+      trainType,
+      direction,
+      legs,
+      departures: [
+        { time: 'In 3 mins', type: trainType, platform: 'Platform 1' },
+        { time: 'In 7 mins', type: 'Slow Local', platform: 'Platform 2' },
+        { time: 'In 12 mins', type: 'Fast Local', platform: 'Platform 1' }
+      ]
+    }
+  });
+}
+
+/**
+ * POST /api/fare/calculate
+ */
+export function postCalculateFare(req, res) {
+  const { distanceKm = 10, travelClass = 'STANDARD', isOffPeak = false } = req.body || {};
+  const dist = Math.max(1, Number(distanceKm) || 10);
+  const multipliers = { STANDARD: 1.0, BUSINESS: 1.6, FIRST: 2.2 };
+  const mult = multipliers[travelClass?.toUpperCase()] || 1.0;
+
+  const basePrice = +(2.50 * mult).toFixed(2);
+  const distanceCharge = +(dist * 0.12 * mult).toFixed(2);
+  const subtotal = +(basePrice + distanceCharge).toFixed(2);
+  const discountApplied = isOffPeak ? +(subtotal * 0.15).toFixed(2) : 0;
+  const taxable = subtotal - discountApplied;
+  const tax = +(taxable * 0.08).toFixed(2);
+  const totalFare = +(taxable + tax).toFixed(2);
+
+  res.json({
+    success: true,
+    fareSummary: {
+      basePrice,
+      distanceCharge,
+      discountApplied,
+      tax,
+      totalFare
+    }
+  });
+}

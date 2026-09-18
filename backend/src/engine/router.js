@@ -241,6 +241,15 @@ export function calculateBearing(lat1, lng1, lat2, lng2) {
 }
 
 /**
+ * Convert azimuth angle to 8-point cardinal direction.
+ */
+export function bearingToCardinal(deg) {
+  const directions = ['North (N)', 'North-East (NE)', 'East (E)', 'South-East (SE)', 'South (S)', 'South-West (SW)', 'West (W)', 'North-West (NW)'];
+  const index = Math.round(((deg % 360) / 45)) % 8;
+  return directions[index];
+}
+
+/**
  * Generate structured Google Maps style navigation maneuvers with turn angles and bearings.
  */
 function generateManeuvers(nodes, edges, routeType) {
@@ -253,6 +262,7 @@ function generateManeuvers(nodes, edges, routeType) {
       distance: 0,
       estimatedTime: 0,
       bearing: 0,
+      cardinal: 'North (N)',
       fromNode: nodes[0],
       toNode: nodes[0]
     }];
@@ -265,11 +275,13 @@ function generateManeuvers(nodes, edges, routeType) {
     const toNode = nodes[i + 1];
     const edge = edges[i];
 
-    const bearing = calculateBearing(fromNode.lat, fromNode.lng, toNode.lat, toNode.lng);
+    const rawBearing = calculateBearing(fromNode.lat, fromNode.lng, toNode.lat, toNode.lng);
+    const bearing = Math.round(rawBearing);
+    const cardinal = bearingToCardinal(bearing);
 
     let type = 'STRAIGHT';
     let icon = '⬆️';
-    let turnDescription = `Walk ${edge.distance}m toward ${toNode.name}`;
+    let turnDescription = `Head ${cardinal} for ${edge.distance}m toward ${toNode.name}`;
 
     if (toNode.type === 'LIFT') {
       type = 'LIFT';
@@ -285,7 +297,7 @@ function generateManeuvers(nodes, edges, routeType) {
       turnDescription = `Boarding Deck: ${toNode.name} (${edge.distance}m ahead)`;
     } else if (i > 0) {
       const prevNode = nodes[i - 1];
-      const prevBearing = calculateBearing(prevNode.lat, prevNode.lng, fromNode.lat, fromNode.lng);
+      const prevBearing = Math.round(calculateBearing(prevNode.lat, prevNode.lng, fromNode.lat, fromNode.lng));
       let diff = bearing - prevBearing;
       while (diff < -180) diff += 360;
       while (diff > 180) diff -= 360;
@@ -313,6 +325,7 @@ function generateManeuvers(nodes, edges, routeType) {
       distance: edge.distance,
       estimatedTime: edge.estimated_time,
       bearing,
+      cardinal,
       fromNode,
       toNode
     });

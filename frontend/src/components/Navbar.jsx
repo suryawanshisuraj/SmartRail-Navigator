@@ -13,7 +13,9 @@ export default function Navbar({
   setLanguage,
   onDetectRealLocation,
   isGpsActive,
-  isGpsLoading
+  isGpsLoading,
+  activeTab = 'WAYFINDING',
+  onSelectTab
 }) {
   const currentStation = stations.find(s => s.id === Number(selectedStationId)) || stations[0];
 
@@ -51,7 +53,7 @@ export default function Navbar({
       </div>
 
       {/* Main Bar */}
-      <div style={{
+      <div className="navbar-container" style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -60,7 +62,7 @@ export default function Navbar({
         flexWrap: 'wrap'
       }}>
         {/* Brand & Central Line Station Selector */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: '320px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <div style={{
             width: '40px',
             height: '40px',
@@ -76,15 +78,18 @@ export default function Navbar({
 
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+              <h1 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'inline' }}>
                 SmartRail <span style={{ color: 'var(--accent-cyan)' }}>Navigator</span>
-              </span>
+              </h1>
               <span className="badge badge-cyan" style={{ fontSize: '0.65rem' }}>Central Line</span>
             </div>
 
-            {/* Station Dropdown */}
+            {/* Station Dropdown with accessible label */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
+              <label htmlFor="station-selector" className="sr-only">Select Central Line Railway Station</label>
               <select
+                id="station-selector"
+                name="selectedStationId"
                 value={selectedStationId}
                 onChange={(e) => onSelectStation(Number(e.target.value))}
                 aria-label="Select Central Line Railway Station"
@@ -195,10 +200,13 @@ export default function Navbar({
             <span>{accessibleMode ? 'Step-Free ON ♿' : 'Accessibility'}</span>
           </button>
 
-          {/* Language Selector */}
+          {/* Language Selector with label */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f8fafc', padding: '0.35rem 0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid #e2e8f0' }}>
             <Globe size={14} color="#64748b" />
+            <label htmlFor="language-selector" className="sr-only">Select Language</label>
             <select
+              id="language-selector"
+              name="language"
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
               aria-label="Select voice and text navigation language"
@@ -219,6 +227,52 @@ export default function Navbar({
           </div>
         </div>
       </div>
+
+      {/* Navigation Sub-Bar / App View Mode Switcher */}
+      <nav aria-label="Main Navigation" style={{
+        background: '#f8fafc',
+        borderTop: '1px solid var(--border-glass)',
+        padding: '0.35rem 2rem',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+        overflowX: 'auto'
+      }}>
+        {[
+          { id: 'WAYFINDING', label: '🗺️ Station Map & Wayfinding' },
+          { id: 'PLANNER', label: '🧭 Journey Planner' },
+          { id: 'TRAINS', label: '🚆 Live Train Fleet' },
+          { id: 'FARES', label: '💳 Fare Calculator' }
+        ].map(tab => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              className={`nav-tab-btn ${isActive ? 'active' : ''}`}
+              onClick={() => onSelectTab && onSelectTab(tab.id)}
+              aria-current={isActive ? 'page' : undefined}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '0.4rem 0.9rem',
+                borderRadius: 'var(--radius-sm)',
+                border: isActive ? '1.5px solid #0284c7' : '1px solid transparent',
+                background: isActive ? '#e0f2fe' : 'transparent',
+                color: isActive ? '#0284c7' : 'var(--text-secondary)',
+                fontSize: '0.82rem',
+                fontWeight: isActive ? 800 : 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </nav>
     </header>
   );
 }

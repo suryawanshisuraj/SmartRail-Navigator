@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sparkles, Send, Bot, User, ArrowRight } from 'lucide-react';
 import { askAIAssistant } from '../services/transitService';
 
@@ -11,6 +11,17 @@ export default function AIAssistantDrawer({ station, currentLocationNode, access
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (station?.name) {
+      setMessages([
+        {
+          role: 'assistant',
+          text: `Namaskar! I am your SmartRail Assistant for ${station.name}. Ask me where any platform, restroom, food stall, or FOB lift is, and I will navigate you.`
+        }
+      ]);
+    }
+  }, [station?.id]);
 
   // Dynamic suggestions based on station
   const sampleQueries = station?.id === 1
@@ -146,11 +157,17 @@ export default function AIAssistantDrawer({ station, currentLocationNode, access
 
       {/* Input */}
       <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} style={{ display: 'flex', gap: '0.4rem' }}>
+        <label htmlFor="ai-assistant-query" className="sr-only">
+          Ask Transit AI Assistant
+        </label>
         <input
+          id="ai-assistant-query"
+          name="aiQuery"
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={`Ask about platforms 1 to ${station?.totalPlatforms || 18}...`}
+          aria-label={`Ask about platforms 1 to ${station?.totalPlatforms || 18} or station facilities`}
           style={{
             flex: 1,
             padding: '0.55rem 0.8rem',

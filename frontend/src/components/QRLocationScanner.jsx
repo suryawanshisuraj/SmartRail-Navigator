@@ -164,7 +164,13 @@ export default function QRLocationScanner({ isOpen, onClose, onLocationDetected,
 
         {/* Manual code entry */}
         <form onSubmit={(e) => { e.preventDefault(); handleScan(); }} style={{ display: 'flex', gap: '0.5rem' }}>
+          <label htmlFor="qr-manual-code-input" className="sr-only">
+            Enter Station QR Code Identifier
+          </label>
           <input
+            id="qr-manual-code-input"
+            name="qrCode"
+            aria-label="Enter station QR code identifier"
             type="text"
             value={inputCode}
             onChange={(e) => setInputCode(e.target.value)}

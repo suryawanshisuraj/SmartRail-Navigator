@@ -1,14 +1,25 @@
-import React, { useState } from 'react';
-import { ArrowRightLeft, Clock, Navigation2, ShieldCheck, Footprints, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowRightLeft, Clock, Navigation2, ShieldCheck, Footprints, AlertCircle, Train } from 'lucide-react';
 import { searchRoute } from '../services/transitService';
 
-export default function RouteSearch({ stations, accessibleMode, onSelectStationForMap, onSelectLegForFare }) {
-  const [origin, setOrigin] = useState('STN_METRO_CENTRAL');
-  const [destination, setDestination] = useState('STN_NORTH_GATE');
+export default function RouteSearch({ stations = [], accessibleMode, onSelectStationForMap, onSelectLegForFare }) {
+  const [origin, setOrigin] = useState(stations[0]?.id || 1);
+  const [destination, setDestination] = useState(stations[stations.length - 1]?.id || 26);
   const [preference, setPreference] = useState('fastest');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [itineraryResult, setItineraryResult] = useState(null);
+
+  useEffect(() => {
+    if (stations && stations.length > 0) {
+      if (!stations.some(s => s.id === Number(origin))) {
+        setOrigin(stations[0].id);
+      }
+      if (!stations.some(s => s.id === Number(destination))) {
+        setDestination(stations[stations.length - 1].id);
+      }
+    }
+  }, [stations]);
 
   const handleSwap = () => {
     const temp = origin;
@@ -41,37 +52,39 @@ export default function RouteSearch({ stations, accessibleMode, onSelectStationF
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 420px) 1fr', gap: '2rem', alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '1.5rem', alignItems: 'start' }}>
       {/* Search Controls Panel */}
-      <div className="glass-panel" style={{ padding: '1.75rem' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+      <div className="glass-panel" style={{ padding: '1.75rem', background: '#ffffff' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#0f172a' }}>
           <Navigation2 size={20} color="var(--accent-cyan)" />
-          <span>Plan Journey</span>
+          <span>Plan Central Line Journey</span>
         </h2>
 
         <form onSubmit={handleSearch} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {/* Origin */}
           <div>
-            <label htmlFor="origin-select" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
+            <label htmlFor="origin-select" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
               DEPARTURE STATION
             </label>
             <select
               id="origin-select"
+              name="origin"
               value={origin}
-              onChange={(e) => setOrigin(e.target.value)}
+              onChange={(e) => setOrigin(Number(e.target.value))}
               style={{
                 width: '100%',
                 padding: '0.75rem 1rem',
-                background: 'rgba(15, 23, 42, 0.8)',
-                border: '1px solid var(--border-glass)',
+                background: '#ffffff',
+                border: '1.5px solid #cbd5e1',
                 borderRadius: 'var(--radius-md)',
-                color: 'var(--text-primary)',
-                fontSize: '0.925rem'
+                color: '#0f172a',
+                fontSize: '0.925rem',
+                fontWeight: 600
               }}
             >
               {stations.map(stn => (
                 <option key={stn.id} value={stn.id}>
-                  {stn.name} ({stn.city}) {stn.isWheelchairAccessible ? '♿' : ''}
+                  {stn.name} {stn.zone ? `(${stn.zone})` : ''} ♿
                 </option>
               ))}
             </select>
@@ -93,26 +106,28 @@ export default function RouteSearch({ stations, accessibleMode, onSelectStationF
 
           {/* Destination */}
           <div>
-            <label htmlFor="dest-select" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
+            <label htmlFor="dest-select" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
               DESTINATION STATION
             </label>
             <select
               id="dest-select"
+              name="destination"
               value={destination}
-              onChange={(e) => setDestination(e.target.value)}
+              onChange={(e) => setDestination(Number(e.target.value))}
               style={{
                 width: '100%',
                 padding: '0.75rem 1rem',
-                background: 'rgba(15, 23, 42, 0.8)',
-                border: '1px solid var(--border-glass)',
+                background: '#ffffff',
+                border: '1.5px solid #cbd5e1',
                 borderRadius: 'var(--radius-md)',
-                color: 'var(--text-primary)',
-                fontSize: '0.925rem'
+                color: '#0f172a',
+                fontSize: '0.925rem',
+                fontWeight: 600
               }}
             >
               {stations.map(stn => (
                 <option key={stn.id} value={stn.id}>
-                  {stn.name} ({stn.city}) {stn.isWheelchairAccessible ? '♿' : ''}
+                  {stn.name} {stn.zone ? `(${stn.zone})` : ''} ♿
                 </option>
               ))}
             </select>
@@ -213,7 +228,7 @@ export default function RouteSearch({ stations, accessibleMode, onSelectStationF
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>
-                  ${itineraryResult.estimatedFare.toFixed(2)}
+                  ₹{itineraryResult.estimatedFare.toFixed(2)}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Estimated Fare</div>
               </div>
