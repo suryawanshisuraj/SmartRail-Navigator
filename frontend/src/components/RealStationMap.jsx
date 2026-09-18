@@ -49,6 +49,7 @@ export default function RealStationMap({
   const [showRailOverlay, setShowRailOverlay] = useState(true);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [isSimulatingWalk, setIsSimulatingWalk] = useState(false);
+  const [currentZoom, setCurrentZoom] = useState(17);
 
   // Extract or generate structured maneuvers from the calculated route
   const maneuvers = useMemo(() => {
@@ -234,6 +235,10 @@ export default function RealStationMap({
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
+    map.on('zoomend', () => {
+      setCurrentZoom(map.getZoom());
+    });
+
     mapInstanceRef.current = map;
 
     return () => {
@@ -374,24 +379,29 @@ export default function RealStationMap({
           </div>
         `;
       } else if (node.type === 'PLATFORM') {
+        if (currentZoom < 14 && !isDest) return;
         badgeHtml = `
           <div style="background: #ffffff; border: 2px solid #1a73e8; color: #1a73e8; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); white-space: nowrap; display: flex; align-items: center; gap: 4px; cursor: pointer;">
             <span>🚆</span> P${node.platformNumber}
           </div>
         `;
       } else if (node.type === 'ENTRANCE') {
+        if (currentZoom < 13 && !isDest) return;
         badgeHtml = `
           <div style="background: #ffffff; border: 1.5px solid #475569; color: #1e293b; font-weight: 700; font-size: 10px; padding: 2px 7px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); white-space: nowrap; display: flex; align-items: center; gap: 3px;">
             🚪 ${node.name.includes('East') ? 'East Gate' : 'West Gate'}
           </div>
         `;
       } else if (node.type === 'LIFT') {
+        if (currentZoom < 16 && !isDest) return;
         badgeHtml = `
           <div style="background: #ecfdf5; border: 1.5px solid #059669; color: #047857; font-weight: 700; font-size: 10px; padding: 2px 6px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); white-space: nowrap;">
             ♿ Lift L-1
           </div>
         `;
       } else {
+        // Hide minor amenities, corridors, food, restrooms when zoomed out to prevent black text clusters
+        if (currentZoom < 16 && !isDest) return;
         badgeHtml = `
           <div style="background: #ffffff; border: 1px solid #cbd5e1; color: #475569; font-weight: 600; font-size: 9px; padding: 2px 6px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); white-space: nowrap;">
             ${node.icon || '📍'} ${node.name}
@@ -441,7 +451,7 @@ export default function RealStationMap({
 
       marker.addTo(markersLayerRef.current);
     });
-  }, [nodes, currentLocationNode?.id, destinationNode?.id, station?.id, calculatedRoute, isGpsActive]);
+  }, [nodes, currentLocationNode?.id, destinationNode?.id, station?.id, calculatedRoute, isGpsActive, currentZoom]);
 
   // Render Real Walking Navigation Route with Directional Chevrons
   useEffect(() => {
@@ -464,13 +474,14 @@ export default function RealStationMap({
           lineCap: 'round'
         });
 
-        // Main Route line
+        // Main Route line (Solid line for real highway drive, dashed for walking)
         const routeColor = accessibleMode ? '#059669' : '#1a73e8';
+        const isHighway = calculatedRoute.isLongDistance;
         const mainRoute = L.polyline(latlngs, {
           color: routeColor,
-          weight: 6,
+          weight: isHighway ? 6 : 5,
           opacity: 1,
-          dashArray: '3, 9',
+          dashArray: isHighway ? null : '3, 8',
           lineJoin: 'round',
           lineCap: 'round'
         });
@@ -478,10 +489,11 @@ export default function RealStationMap({
         casing.addTo(routeLayerRef.current);
         mainRoute.addTo(routeLayerRef.current);
 
-        // Directional Chevrons along each walking segment
-        for (let i = 0; i < validNodes.length - 1; i++) {
+        // Directional Chevrons spaced along the route
+        const arrowStep = validNodes.length > 20 ? Math.ceil(validNodes.length / 10) : 1;
+        for (let i = 0; i < validNodes.length - 1; i += arrowStep) {
           const from = validNodes[i];
-          const to = validNodes[i + 1];
+          const to = validNodes[Math.min(i + 1, validNodes.length - 1)];
           const midLat = (from.lat + to.lat) / 2;
           const midLng = (from.lng + to.lng) / 2;
           const bearing = Math.round(calculateBearing(from.lat, from.lng, to.lat, to.lng));
@@ -502,9 +514,9 @@ export default function RealStationMap({
           L.marker([midLat, midLng], { icon: arrowIcon, interactive: false }).addTo(arrowsLayerRef.current);
         }
 
-        // Waypoint step badges
+        // Waypoint step badges (rendered only for key turning points, not high-density road samples)
         validNodes.forEach((n, idx) => {
-          if (idx === 0 || idx === validNodes.length - 1) return;
+          if (idx === 0 || idx === validNodes.length - 1 || n.isRoad) return;
           const isActiveStep = activeStepIndex === idx;
 
           const stepIcon = L.divIcon({
@@ -737,27 +749,28 @@ export default function RealStationMap({
         {calculatedRoute && calculatedRoute.success && (
           <div style={{
             position: 'absolute',
-            top: '12px',
-            left: '12px',
+            top: '16px',
+            left: '16px',
             zIndex: 20,
-            background: 'rgba(255, 255, 255, 0.96)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid #e2e8f0',
+            background: 'rgba(255, 255, 255, 0.98)',
+            backdropFilter: 'blur(16px)',
+            border: '1.5px solid #cbd5e1',
             borderRadius: '14px',
-            boxShadow: '0 12px 32px rgba(15, 23, 42, 0.16)',
-            maxWidth: '440px',
-            width: 'calc(100% - 24px)',
+            boxShadow: '0 12px 32px rgba(15, 23, 42, 0.18)',
+            maxWidth: '460px',
+            width: 'calc(100% - 32px)',
             overflow: 'hidden'
           }}>
             {/* Top Navigation Banner */}
             <div style={{
-              background: accessibleMode ? '#047857' : '#1a73e8',
+              background: accessibleMode ? '#047857' : (calculatedRoute.isLongDistance ? '#0369a1' : '#1a73e8'),
               color: '#ffffff',
-              padding: '0.75rem 1rem',
+              padding: '0.85rem 1rem',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: '0.75rem'
+              gap: '0.75rem',
+              minHeight: '68px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <div style={{
@@ -771,18 +784,18 @@ export default function RealStationMap({
                   fontSize: '20px',
                   flexShrink: 0
                 }}>
-                  {activeManeuver?.icon || '⬆️'}
+                  {activeManeuver?.icon || (calculatedRoute.isLongDistance ? '🚗' : '⬆️')}
                 </div>
-                <div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 800, letterSpacing: '-0.01em', lineHeight: '1.25' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '0.96rem', fontWeight: 800, letterSpacing: '-0.01em', lineHeight: '1.35', wordBreak: 'break-word' }}>
                     {activeManeuver?.instruction || `Head to ${destinationNode?.name}`}
                   </div>
-                  <div style={{ fontSize: '0.72rem', opacity: 0.9, display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.15rem' }}>
+                  <div style={{ fontSize: '0.72rem', opacity: 0.92, display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
                     <span>🧭 Heading {Math.round(activeManeuver?.bearing || 0)}° {activeManeuver?.cardinal || bearingToCardinal(activeManeuver?.bearing || 0)}</span>
                     {activeManeuver?.distance > 0 && (
                       <>
                         <span>&bull;</span>
-                        <span>{activeManeuver.distance}m</span>
+                        <span>{activeManeuver.distance >= 1000 ? `${(activeManeuver.distance / 1000).toFixed(1)} km` : `${activeManeuver.distance}m`}</span>
                       </>
                     )}
                   </div>
@@ -816,13 +829,20 @@ export default function RealStationMap({
             {/* Bottom Controls & Step Progression Carousel */}
             <div style={{ padding: '0.65rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', background: '#ffffff', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Footprints size={15} color="#1a73e8" />
+                {calculatedRoute.isLongDistance ? (
+                  <span style={{ fontSize: '15px' }}>🚗</span>
+                ) : (
+                  <Footprints size={15} color="#1a73e8" />
+                )}
                 <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
                   {Math.ceil(calculatedRoute.estimatedTime / 60)} min
                 </span>
                 <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                  ({calculatedRoute.distance} m)
+                  ({calculatedRoute.distance >= 1000 ? `${(calculatedRoute.distance / 1000).toFixed(1)} km` : `${calculatedRoute.distance} m`})
                 </span>
+                {calculatedRoute.isLongDistance && (
+                  <span className="badge badge-cyan" style={{ fontSize: '0.65rem' }}>Highway Drive</span>
+                )}
               </div>
 
               {/* Step Navigation & Live Walk Simulator */}

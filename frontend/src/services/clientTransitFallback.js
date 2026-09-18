@@ -309,7 +309,14 @@ export function findNearestStation(userLat, userLng) {
     }
   });
 
-  return { station: nearest, distanceMeters: minDistance };
+  return {
+    ...nearest,
+    station: nearest,
+    id: nearest.id,
+    code: nearest.code,
+    name: nearest.name,
+    distanceMeters: Math.round(minDistance)
+  };
 }
 
 function clientHeuristic(nodeA, nodeB) {

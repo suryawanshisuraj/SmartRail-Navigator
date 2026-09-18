@@ -39,6 +39,7 @@ export default function App() {
   const [realGpsPosition, setRealGpsPosition] = useState(null);
   const [isGpsActive, setIsGpsActive] = useState(false);
   const [isGpsLoading, setIsGpsLoading] = useState(false);
+  const [gpsDistanceNotice, setGpsDistanceNotice] = useState(null);
 
   // Load Station Data
   const loadStation = useCallback(async (stnId, targetDestId = null) => {
@@ -137,16 +138,34 @@ export default function App() {
 
       // Find nearest station along Mumbai Central line
       const nearest = findNearestStation(pos.lat, pos.lng);
+      const nearestStation = nearest?.station || nearest;
+      const nearestId = nearestStation?.id;
+      const distanceToNearest = nearest?.distanceMeters || 0;
 
       let targetStationId = selectedStationId;
       let targetStationData = stationData;
 
-      if (nearest && nearest.id !== selectedStationId && nearest.distanceMeters < 50000) {
-        setAnnouncement(`Live GPS detected you near ${nearest.name} (${(nearest.distanceMeters / 1000).toFixed(1)} km away). Switching station...`);
-        setSelectedStationId(nearest.id);
-        targetStationId = nearest.id;
-        targetStationData = await fetchStationData(nearest.id);
+      // If user is within 3km of another station, auto-switch to that station
+      if (nearestStation && nearestId && nearestId !== selectedStationId && distanceToNearest < 3000) {
+        setAnnouncement(`Live GPS detected you near ${nearestStation.name} (${(distanceToNearest / 1000).toFixed(1)} km away). Switching station...`);
+        setSelectedStationId(nearestId);
+        targetStationId = nearestId;
+        targetStationData = await fetchStationData(nearestId);
         setStationData(targetStationData);
+        setGpsDistanceNotice(null);
+      } else {
+        const distToTarget = haversineDistanceMeters(pos.lat, pos.lng, targetStationData?.lat || 18.94, targetStationData?.lng || 72.835);
+        if (distToTarget > 2500 && nearestStation) {
+          setGpsDistanceNotice({
+            isFar: true,
+            distanceKm: +(distToTarget / 1000).toFixed(1),
+            nearestStation,
+            nearestDistanceKm: +(distanceToNearest / 1000).toFixed(1),
+            targetStationName: targetStationData?.name || 'Selected Station'
+          });
+        } else {
+          setGpsDistanceNotice(null);
+        }
       }
 
       // Find closest entrance in target station data
@@ -185,7 +204,8 @@ export default function App() {
       setCalculatedRoute(res);
 
       const destNode = targetStationData?.nodes.find(n => n.id === targetDest);
-      setAnnouncement(`GPS Locked! Accuracy ±${pos.accuracy}m. Wayfinding path ready to ${destNode?.name || 'Platform'}.`);
+      const modeLabel = res?.isLongDistance ? 'highway road route' : 'pedestrian wayfinding';
+      setAnnouncement(`GPS Locked! Accuracy ±${pos.accuracy}m. Real ${modeLabel} ready to ${destNode?.name || 'Platform'}.`);
     } catch (err) {
       console.error('GPS error:', err);
       setAnnouncement(`Location status: ${err.message || 'Could not obtain device location. Please check browser location permissions.'}`);
@@ -270,6 +290,57 @@ export default function App() {
           <div className="main-dashboard-grid">
             {/* Left Column: Real Geographic Station Map & Floorplan Switcher */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {/* GPS Long-Distance Route Notification Banner */}
+              {gpsDistanceNotice && gpsDistanceNotice.isFar && isGpsActive && (
+                <div style={{
+                  background: 'linear-gradient(90deg, #eff6ff, #f0fdf4)',
+                  border: '1.5px solid #93c5fd',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '0.75rem 1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '1rem',
+                  flexWrap: 'wrap',
+                  boxShadow: '0 2px 8px rgba(2, 132, 199, 0.08)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{ fontSize: '1.35rem' }}>📍</span>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1e3a8a' }}>
+                        Real GPS Active &bull; {gpsDistanceNotice.distanceKm} km from {gpsDistanceNotice.targetStationName}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.15rem' }}>
+                        Displaying real road highway route on map into station gate. Nearest Central Line hub: <strong>{gpsDistanceNotice.nearestStation.name}</strong> ({gpsDistanceNotice.nearestDistanceKm} km).
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem' }}
+                      onClick={() => setActiveTab('PLANNER')}
+                    >
+                      <span>🚆 Plan Train from Nearest Hub</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem' }}
+                      onClick={async () => {
+                        setSelectedStationId(gpsDistanceNotice.nearestStation.id);
+                        const stn = await fetchStationData(gpsDistanceNotice.nearestStation.id);
+                        setStationData(stn);
+                        setGpsDistanceNotice(null);
+                      }}
+                    >
+                      <span>Switch to {gpsDistanceNotice.nearestStation.code}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Map Mode Tab Switcher */}
               <div style={{
                 display: 'flex',

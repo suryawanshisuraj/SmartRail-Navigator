@@ -149,46 +149,303 @@ export async function scanQRCode(code, stationId = 1) {
 }
 
 /**
+ * High-fidelity fallback that follows Mumbai road corridors (Vashi Bridge / Eastern Freeway / Highways)
+ * instead of cutting across the ocean when offline or router timeout.
+ */
+function generateMumbaiCorridorFallback(startLat, startLng, endLat, endLng, isWalking) {
+  const directDist = haversineDistanceMeters(startLat, startLng, endLat, endLng);
+  
+  if (isWalking || directDist < 2500) {
+    const midLat = startLat + (endLat - startLat) * 0.5;
+    const coords = [
+      [startLng, startLat],
+      [startLng, midLat],
+      [endLng, midLat],
+      [endLng, endLat]
+    ];
+    const distance = Math.round(directDist * 1.25);
+    const duration = Math.round(distance * 0.85);
+    const bearing = Math.round(calculateBearing(startLat, startLng, midLat, startLng));
+    return {
+      success: true,
+      distance,
+      duration,
+      coordinates: coords,
+      maneuvers: [
+        {
+          stepIndex: 1,
+          instruction: `Walk along Station Approach Road toward entrance gate (${distance}m)`,
+          type: 'ROAD_WALK',
+          icon: '🚶',
+          distance,
+          bearing,
+          cardinal: bearingToCardinal(bearing)
+        }
+      ],
+      isRoadRoute: true,
+      mode: 'WALK'
+    };
+  }
+
+  // Regional distance (> 2.5 km)
+  let coords = [];
+  if (startLng > 72.95 && endLng < 72.86) {
+    // Navi Mumbai to South Mumbai corridor via Vashi Bridge & Eastern Freeway
+    coords = [
+      [startLng, startLat],
+      [73.0200, 19.0350], // Palm Beach Marg
+      [72.9980, 19.0580], // Sion-Panvel Highway
+      [72.9770, 19.0680], // Vashi Bridge over Thane Creek
+      [72.9320, 19.0520], // Mankhurd Flyover
+      [72.8900, 19.0400], // Eastern Freeway Entry (Chembur)
+      [72.8680, 19.0050], // Eastern Freeway Elevated Corridor (Wadala)
+      [72.8420, 18.9480], // Eastern Freeway Exit (P. D'Mello Road)
+      [endLng, endLat]    // CSMT East Gate
+    ];
+  } else if (startLat > 19.18 && endLat < 19.05) {
+    // Thane / Beyond Thane to Central / South Mumbai via Eastern Express Highway
+    coords = [
+      [startLng, startLat],
+      [72.9750, 19.1850],
+      [72.9560, 19.1720],
+      [72.9290, 19.1110],
+      [72.8850, 19.0650],
+      [72.8650, 19.0150],
+      [72.8420, 18.9480],
+      [endLng, endLat]
+    ];
+  } else {
+    const midLng = (startLng + endLng) / 2;
+    const midLat = (startLat + endLat) / 2;
+    coords = [
+      [startLng, startLat],
+      [midLng, startLat],
+      [midLng, endLat],
+      [endLng, endLat]
+    ];
+  }
+
+  let totalDist = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    totalDist += haversineDistanceMeters(coords[i][1], coords[i][0], coords[i + 1][1], coords[i + 1][0]);
+  }
+  totalDist = Math.round(totalDist * 1.15);
+  const duration = Math.round(totalDist / 18); // ~65 km/h driving speed
+
+  const startBearing = Math.round(calculateBearing(startLat, startLng, coords[1][1], coords[1][0]));
+  const maneuvers = [
+    {
+      stepIndex: 1,
+      instruction: `Head onto arterial road corridor towards highway (${(totalDist / 1000).toFixed(1)} km)`,
+      type: 'ROAD_DRIVE',
+      icon: '🚗',
+      distance: totalDist,
+      bearing: startBearing,
+      cardinal: bearingToCardinal(startBearing)
+    }
+  ];
+
+  return {
+    success: true,
+    distance: totalDist,
+    duration,
+    coordinates: coords,
+    maneuvers,
+    isRoadRoute: true,
+    mode: 'DRIVE'
+  };
+}
+
+/**
+ * Fetch real street/highway route between GPS coordinate and station gate
+ * Uses public OSRM router (walking for < 2.5km, driving for >= 2.5km)
+ * with robust high-fidelity Mumbai transit corridor fallback.
+ */
+export async function fetchRealRoadRoute(startLat, startLng, endLat, endLng) {
+  const distDirect = haversineDistanceMeters(startLat, startLng, endLat, endLng);
+  const isWalking = distDirect < 2500;
+  const profile = isWalking ? 'walking' : 'driving';
+  const url = `https://router.project-osrm.org/route/v1/${profile}/${startLng},${startLat};${endLng},${endLat}?geometries=geojson&steps=true&overview=full`;
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+        const primary = data.routes[0];
+        const coordinates = primary.geometry.coordinates; // Array of [lng, lat]
+        const steps = primary.legs[0]?.steps || [];
+
+        const maneuvers = [];
+        for (let i = 0; i < steps.length; i++) {
+          const step = steps[i];
+          if (step.distance > 8) {
+            const maneuverType = step.maneuver?.type || 'turn';
+            const modifier = step.maneuver?.modifier || '';
+            const roadName = step.name || (isWalking ? 'Walkway' : 'Road Corridor');
+            const icon = isWalking ? '🚶' : '🚗';
+            const distRounded = Math.round(step.distance);
+            const distText = distRounded >= 1000 ? `${(distRounded / 1000).toFixed(1)} km` : `${distRounded}m`;
+            
+            let instruction = '';
+            if (maneuverType === 'depart') {
+              instruction = `Depart on ${roadName} towards station (${distText})`;
+            } else if (maneuverType === 'arrive') {
+              instruction = `Arrive at station entrance gate`;
+            } else {
+              const action = modifier ? `Turn ${modifier} onto ${roadName}` : `Continue on ${roadName}`;
+              instruction = `${action} (${distText})`;
+            }
+
+            maneuvers.push({
+              stepIndex: maneuvers.length + 1,
+              instruction,
+              type: isWalking ? 'ROAD_WALK' : 'ROAD_DRIVE',
+              icon,
+              distance: distRounded,
+              roadName,
+              bearing: Math.round(step.maneuver?.bearing_after || 0),
+              cardinal: bearingToCardinal(Math.round(step.maneuver?.bearing_after || 0))
+            });
+          }
+        }
+
+        if (maneuvers.length === 0) {
+          maneuvers.push({
+            stepIndex: 1,
+            instruction: `Head on road toward station gate (${(primary.distance / 1000).toFixed(1)} km)`,
+            type: isWalking ? 'ROAD_WALK' : 'ROAD_DRIVE',
+            icon: isWalking ? '🚶' : '🚗',
+            distance: Math.round(primary.distance),
+            bearing: Math.round(calculateBearing(startLat, startLng, endLat, endLng)),
+            cardinal: bearingToCardinal(Math.round(calculateBearing(startLat, startLng, endLat, endLng)))
+          });
+        }
+
+        return {
+          success: true,
+          distance: Math.round(primary.distance),
+          duration: Math.round(primary.duration),
+          coordinates,
+          maneuvers,
+          isRoadRoute: true,
+          mode: isWalking ? 'WALK' : 'DRIVE'
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('[Transit] OSRM query timed out or unreachable, using corridor fallback:', e);
+  }
+
+  return generateMumbaiCorridorFallback(startLat, startLng, endLat, endLng, isWalking);
+}
+
+/**
  * Calculate route between start and destination with real GPS support
  */
 export async function computeIndoorRoute(startNodeId, destinationNodeId, routeType = 'NORMAL', stationId = 1, customGpsNode = null) {
-  // If routing from live GPS node, construct dynamic routing on the client
+  // If routing from live GPS node, construct real road + indoor routing
   if (customGpsNode && customGpsNode.isRealGps) {
     const layout = getClientStationLayout(stationId);
     const nodesCopy = [...layout.nodes];
-    const edgesCopy = [...layout.edges];
 
     // Find closest entrance or concourse node to user's real coordinates
     const entranceNodes = nodesCopy.filter(n => n.type === 'ENTRANCE' || n.type === 'CORRIDOR');
-    let nearestNode = entranceNodes[0] || nodesCopy[0];
+    let nearestEntrance = entranceNodes[0] || nodesCopy[0];
     let minDistance = Infinity;
 
     entranceNodes.forEach(n => {
       const dist = haversineDistanceMeters(customGpsNode.lat, customGpsNode.lng, n.lat, n.lng);
       if (dist < minDistance) {
         minDistance = dist;
-        nearestNode = n;
+        nearestEntrance = n;
       }
     });
 
-    const walkDist = Math.max(15, minDistance);
-    const walkTime = Math.round(walkDist * 0.85);
-
-    const resolvedGpsNode = {
-      ...customGpsNode,
-      x: customGpsNode.x !== undefined ? customGpsNode.x : (nearestNode.x || 80),
-      y: customGpsNode.y !== undefined ? customGpsNode.y : (nearestNode.y || 480)
-    };
-
-    // Insert live GPS node and connect directly to nearest entrance
-    nodesCopy.unshift(resolvedGpsNode);
-    edgesCopy.unshift(
-      { from_node_id: resolvedGpsNode.id, to_node_id: nearestNode.id, distance: walkDist, estimated_time: walkTime, accessible: true, blocked: false },
-      { from_node_id: nearestNode.id, to_node_id: resolvedGpsNode.id, distance: walkDist, estimated_time: walkTime, accessible: true, blocked: false }
+    // 1. Fetch real road route from GPS position to station entrance
+    const roadRoute = await fetchRealRoadRoute(
+      customGpsNode.lat,
+      customGpsNode.lng,
+      nearestEntrance.lat,
+      nearestEntrance.lng
     );
 
-    const dynamicGraph = new ClientStationGraph(nodesCopy, edgesCopy);
-    return calculateClientAStarRoute(dynamicGraph, resolvedGpsNode.id, destinationNodeId, routeType);
+    // 2. Compute indoor route from entrance to destination platform/amenity
+    const indoorRes = calculateClientAStarRoute(layout.graph, nearestEntrance.id, destinationNodeId, routeType);
+
+    // 3. Build synthetic road waypoint nodes along the real road path
+    const coords = roadRoute.coordinates || [];
+    const step = coords.length > 80 ? Math.ceil(coords.length / 50) : 1;
+    const roadWaypoints = [];
+    
+    for (let i = 0; i < coords.length; i += step) {
+      const pt = coords[i];
+      roadWaypoints.push({
+        id: `ROAD_WAYPOINT_${i}`,
+        name: `Road Corridor Waypoint (${i + 1})`,
+        floor_id: 1,
+        lat: pt[1],
+        lng: pt[0],
+        accessible: true,
+        isRoad: true
+      });
+    }
+
+    if (roadWaypoints.length > 0) {
+      roadWaypoints[0] = { ...customGpsNode, floor_id: 1 };
+    }
+
+    // Connect indoor route nodes (skip duplicate entrance if present)
+    const indoorNodes = (indoorRes.route || []).filter(n => n.id !== nearestEntrance.id);
+    const combinedRouteNodes = [
+      ...roadWaypoints,
+      nearestEntrance,
+      ...indoorNodes
+    ];
+
+    // Combine maneuvers
+    const combinedManeuvers = [
+      ...roadRoute.maneuvers,
+      {
+        stepIndex: roadRoute.maneuvers.length + 1,
+        instruction: `Enter station via ${nearestEntrance.name}`,
+        type: 'GATE_ENTRY',
+        icon: '🚪',
+        distance: 20,
+        bearing: Math.round(calculateBearing(nearestEntrance.lat, nearestEntrance.lng, (indoorNodes[0]?.lat || nearestEntrance.lat), (indoorNodes[0]?.lng || nearestEntrance.lng))),
+        cardinal: bearingToCardinal(Math.round(calculateBearing(nearestEntrance.lat, nearestEntrance.lng, (indoorNodes[0]?.lat || nearestEntrance.lat), (indoorNodes[0]?.lng || nearestEntrance.lng))))
+      },
+      ...(indoorRes.maneuvers || []).map((m, i) => ({
+        ...m,
+        stepIndex: roadRoute.maneuvers.length + 2 + i
+      }))
+    ];
+
+    combinedManeuvers.forEach((m, idx) => {
+      m.stepIndex = idx + 1;
+    });
+
+    const totalDistance = roadRoute.distance + (indoorRes.distance || 0);
+    const totalTime = roadRoute.duration + (indoorRes.estimatedTime || 0);
+
+    return {
+      success: true,
+      distance: totalDistance,
+      estimatedTime: totalTime,
+      route: combinedRouteNodes,
+      instructions: combinedManeuvers.map(m => m.instruction),
+      maneuvers: combinedManeuvers,
+      routeType,
+      isRoadRoute: true,
+      isLongDistance: roadRoute.distance > 2500,
+      roadDistanceKm: +(roadRoute.distance / 1000).toFixed(1),
+      roadDurationMinutes: Math.round(roadRoute.duration / 60),
+      accessibilityStatus: routeType === 'ACCESSIBLE' ? true : combinedRouteNodes.every(n => n.accessible)
+    };
   }
 
   // Standard backend routing with fallback
