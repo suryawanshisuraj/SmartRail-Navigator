@@ -241,6 +241,48 @@ export default function NavigationPanel({
         </div>
       </div>
 
+      {/* Quick Amenity Finder */}
+      {facilityDestinations.length > 0 && (
+        <div>
+          <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+            Station Amenities & Facilities
+          </label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+            {facilityDestinations.slice(0, 6).map(f => {
+              const isSelected = selectedDestinationId === f.id;
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedDestinationId(f.id);
+                    onCalculateRoute(f.id, routeType);
+                  }}
+                  style={{
+                    padding: '0.25rem 0.55rem',
+                    borderRadius: 'var(--radius-full)',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    border: isSelected ? '1.5px solid #d97706' : '1px solid #e2e8f0',
+                    background: isSelected ? '#fef3c7' : '#ffffff',
+                    color: isSelected ? '#92400e' : '#475569',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <span>{f.icon || '📍'}</span>
+                  <span>{f.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Route Mode Buttons */}
       <div>
         <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem' }}>

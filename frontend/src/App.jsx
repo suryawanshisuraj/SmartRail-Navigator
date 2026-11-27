@@ -8,6 +8,9 @@ import QRLocationScanner from './components/QRLocationScanner';
 import RouteSearch from './components/RouteSearch';
 import LiveTrainTracker from './components/LiveTrainTracker';
 import FareCalculator from './components/FareCalculator';
+import BreadcrumbNavigation from './components/BreadcrumbNavigation';
+import MobileBottomNav from './components/MobileBottomNav';
+import LocationPermissionModal from './components/LocationPermissionModal';
 import { Map, Layers } from 'lucide-react';
 import {
   fetchStationList,
@@ -31,6 +34,7 @@ export default function App() {
   const [accessibleMode, setAccessibleMode] = useState(false);
   const [language, setLanguage] = useState('en');
   const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [announcement, setAnnouncement] = useState('');
   const [mapViewMode, setMapViewMode] = useState('REAL_MAP'); // 'REAL_MAP' or 'SCHEMATIC'
   const [isLoading, setIsLoading] = useState(true);
@@ -83,20 +87,45 @@ export default function App() {
     }
   }, [accessibleMode, routeType]);
 
-  // Initial catalog fetch & first station setup
+  // Initial catalog fetch & first station setup with URL hash check
   useEffect(() => {
     async function init() {
       const stnList = await fetchStationList();
       setStations(stnList);
-      await loadStation(1);
+
+      const params = new URLSearchParams(window.location.hash.replace('#', ''));
+      const hashTab = params.get('tab');
+      const hashStation = params.get('station');
+
+      const initialStation = (hashStation && !isNaN(Number(hashStation))) ? Number(hashStation) : 1;
+      if (initialStation !== 1) {
+        setSelectedStationId(initialStation);
+      }
+      if (hashTab && ['WAYFINDING', 'PLANNER', 'TRAINS', 'FARES'].includes(hashTab)) {
+        setActiveTab(hashTab);
+      }
+      await loadStation(initialStation);
     }
     init();
   }, [loadStation]);
+
+  // Sync tab changes to URL hash & browser history
+  const handleSelectTab = (newTab) => {
+    setActiveTab(newTab);
+    const params = new URLSearchParams();
+    params.set('tab', newTab);
+    params.set('station', selectedStationId);
+    window.history.replaceState(null, '', `#${params.toString()}`);
+  };
 
   // Handle Station Switch from Navbar dropdown
   const handleSelectStation = async (newStationId) => {
     setSelectedStationId(newStationId);
     setIsGpsActive(false);
+    const params = new URLSearchParams();
+    params.set('tab', activeTab);
+    params.set('station', newStationId);
+    window.history.replaceState(null, '', `#${params.toString()}`);
     await loadStation(newStationId);
   };
 
@@ -276,10 +305,26 @@ export default function App() {
         language={language}
         setLanguage={setLanguage}
         onDetectRealLocation={handleDetectRealLocation}
+        onOpenLocationPermissionModal={() => setIsLocationModalOpen(true)}
         isGpsActive={isGpsActive}
         isGpsLoading={isGpsLoading}
         activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        onSelectTab={handleSelectTab}
+      />
+
+      {/* Breadcrumb Navigation Hierarchy */}
+      <BreadcrumbNavigation
+        station={stationData}
+        activeTab={activeTab}
+        onSelectTab={handleSelectTab}
+        onOpenStationSearch={() => {
+          const searchInput = document.getElementById('real-station-search-input');
+          if (searchInput) {
+            searchInput.focus();
+          }
+        }}
+        mapViewMode={mapViewMode}
+        setMapViewMode={setMapViewMode}
       />
 
       {/* Main Dashboard Workspace */}
@@ -573,6 +618,31 @@ export default function App() {
         onLocationDetected={handleLocationDetected}
         qrLocations={stationData?.qrLocations || []}
         stationId={selectedStationId}
+      />
+
+      {/* Real GPS Location Permission & Privacy Modal */}
+      <LocationPermissionModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        onConfirmGps={handleDetectRealLocation}
+        onSelectStation={handleSelectStation}
+        popularStations={stations.filter(s => [1, 8, 11, 13, 19, 26].includes(s.id))}
+      />
+
+      {/* Mobile Sticky Bottom Navigation Bar */}
+      <MobileBottomNav
+        activeTab={activeTab}
+        onSelectTab={handleSelectTab}
+        onOpenSearch={() => {
+          const searchInput = document.getElementById('real-station-search-input');
+          if (searchInput) {
+            searchInput.focus();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        }}
+        onDetectLocation={() => setIsLocationModalOpen(true)}
+        isGpsActive={isGpsActive}
+        isGpsLoading={isGpsLoading}
       />
 
       {/* Footer */}

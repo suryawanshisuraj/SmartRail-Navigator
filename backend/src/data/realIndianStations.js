@@ -76,6 +76,7 @@ export const REAL_INDIAN_STATIONS = [
     longitude: 72.8436,
     totalPlatforms: 15,
     railwayLines: ["Central Line", "Western Line", "CR Mainline"],
+    interchanges: ["Western Line (WR)", "CR Mainline"],
     platforms: [
       { number: "1", name: "Platform 1 (CR Slow Down)", accessible: true, lat: 19.0178, lng: 72.8440 },
       { number: "2", name: "Platform 2 (CR Slow Up)", accessible: true, lat: 19.0179, lng: 72.8439 },
@@ -388,6 +389,7 @@ export const REAL_INDIAN_STATIONS = [
     latitude: 19.0657,
     longitude: 72.8794,
     railwayLines: ["Central Line", "Harbour Line"],
+    interchanges: ["Harbour Line", "Trans-Harbour Connector"],
     platforms: [
       { number: "1", name: "Platform 1 (CR Slow)", accessible: true, lat: 19.0654, lng: 72.8788 },
       { number: "2", name: "Platform 2 (CR Slow)", accessible: true, lat: 19.0655, lng: 72.8790 },
