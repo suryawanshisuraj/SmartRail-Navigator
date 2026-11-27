@@ -641,6 +641,85 @@ export const REAL_INDIAN_STATIONS = [
     isTerminus: true,
     osmNodeId: "node/26863083"
   },
+  {
+    id: 108,
+    name: "CBD Belapur",
+    code: "BEPR",
+    city: "Navi Mumbai",
+    state: "Maharashtra",
+    zone: "Central Railway (CR)",
+    latitude: 19.0189,
+    longitude: 73.0401,
+    railwayLines: ["Harbour Line", "Trans-Harbour Line", "Navi Mumbai Metro Line 1"],
+    platforms: [
+      { number: "1", name: "Platform 1 (Harbour Up to CSMT)", accessible: true, lat: 19.0187, lng: 73.0398 },
+      { number: "2", name: "Platform 2 (Harbour Down to Panvel)", accessible: true, lat: 19.0188, lng: 73.0400 },
+      { number: "3", name: "Platform 3 (Trans-Harbour to Thane)", accessible: true, lat: 19.0190, lng: 73.0403 },
+      { number: "4", name: "Platform 4 (Trans-Harbour / Uran)", accessible: true, lat: 19.0191, lng: 73.0405 }
+    ],
+    entrances: [
+      { id: "BEPR_ENTRANCE_WEST", name: "West Entrance (Station Plaza / Sakal Bhavan Rd)", description: "Direct pedestrian road access from Sakal Bhavan Road and Nirmaladevi Marg", lat: 19.0185, lng: 73.0390, accessible: true, type: "WEST" },
+      { id: "BEPR_ENTRANCE_EAST", name: "East Entrance (Sector 11 / CIDCO Complex)", description: "East concourse pedestrian gateway to Sector 11 commercial district", lat: 19.0195, lng: 73.0415, accessible: true, type: "EAST" }
+    ],
+    exits: [
+      { id: "BEPR_EXIT_WEST", name: "West Station Plaza Exit", lat: 19.0186, lng: 73.0389 },
+      { id: "BEPR_EXIT_EAST", name: "East CIDCO Exit", lat: 19.0194, lng: 73.0416 }
+    ],
+    foot_over_bridges: [
+      { id: "BEPR_FOB_CONCOURSE", name: "CIDCO Central Passenger Concourse", lat: 19.0189, lng: 73.0401, connectsPlatforms: ["1", "2", "3", "4"] }
+    ],
+    elevators: [
+      { id: "BEPR_LIFT_1", name: "Concourse Elevator L-1", lat: 19.0188, lng: 73.0396, floor_id: 1 }
+    ],
+    stairs: [
+      { id: "BEPR_STAIRS_1", name: "Concourse Central Stairs", lat: 19.0188, lng: 73.0398 }
+    ],
+    escalators: [
+      { id: "BEPR_ESC_1", name: "Station Entry Escalator", lat: 19.0187, lng: 73.0397 }
+    ],
+    ticketCounters: [
+      { id: "BEPR_TICKET_UTS", name: "UTS Suburban Ticket Hall", lat: 19.0187, lng: 73.0393 }
+    ],
+    restrooms: [
+      { id: "BEPR_RESTROOM_MAIN", name: "Accessible Restroom & Drinking Water", lat: 19.0188, lng: 73.0394, accessible: true }
+    ],
+    waitingAreas: [],
+    foodFacilities: [
+      { id: "BEPR_FOOD_STALL", name: "Station Concourse Tea & Snacks", lat: 19.0189, lng: 73.0404 }
+    ],
+    parking: { available: true, type: "Belapur Station Forecourt Pay & Park", lat: 19.0183, lng: 73.0388 },
+    hasIndoorMap: true,
+    isMajorJunction: true,
+    osmNodeId: "node/26863084"
+  },
+  {
+    id: 109,
+    name: "Nerul",
+    code: "NEU",
+    city: "Navi Mumbai",
+    state: "Maharashtra",
+    zone: "Central Railway (CR)",
+    latitude: 19.0336,
+    longitude: 73.0169,
+    railwayLines: ["Harbour Line", "Trans-Harbour Line", "Uran Line"],
+    totalPlatforms: 4,
+    hasIndoorMap: true,
+    osmNodeId: "node/26863085"
+  },
+  {
+    id: 110,
+    name: "Kharghar",
+    code: "KHAG",
+    city: "Navi Mumbai",
+    state: "Maharashtra",
+    zone: "Central Railway (CR)",
+    latitude: 19.0258,
+    longitude: 73.0645,
+    railwayLines: ["Harbour Line"],
+    totalPlatforms: 4,
+    hasIndoorMap: true,
+    osmNodeId: "node/26863086"
+  },
   // Additional Mumbai Suburban Stations with Verified Real Coordinates
   { id: 2, name: "Masjid Bunder", code: "MSD", city: "Mumbai", state: "Maharashtra", zone: "Central Railway (CR)", latitude: 18.9525, longitude: 72.8384, railwayLines: ["Central Line", "Harbour Line"], hasIndoorMap: false },
   { id: 3, name: "Sandhurst Road", code: "SNRD", city: "Mumbai", state: "Maharashtra", zone: "Central Railway (CR)", latitude: 18.9610, longitude: 72.8398, railwayLines: ["Central Line", "Harbour Line"], hasIndoorMap: false },

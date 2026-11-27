@@ -6,13 +6,42 @@
 
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { createTransitRouter } from './routes/transitRoutes.js';
 
 export function createApp(wssInstance = null) {
   const app = express();
 
-  app.use(cors());
-  app.use(express.json());
+  // Security headers (XSS, content-type sniffing, clickjacking, etc.)
+  app.use(helmet());
+
+  // Rate limiting: 100 requests per minute per IP
+  const limiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, error: 'Too many requests. Please try again later.' }
+  });
+  app.use(limiter);
+
+  // CORS: restrict to known origins (comma-separated in CORS_ORIGIN env var)
+  const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173,http://localhost:5000')
+    .split(',')
+    .map(o => o.trim());
+  app.use(cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. curl, server-to-server, mobile apps)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      }
+    }
+  }));
+
+  app.use(express.json({ limit: '1mb' }));
 
   const transitRouter = createTransitRouter();
 

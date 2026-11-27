@@ -25,11 +25,104 @@ export function getStationLayout(stationId = 1) {
   const stnLat = station.latitude || station.lat || 18.9400;
   const stnLng = station.longitude || station.lng || 72.8354;
 
+  // Real verified entrance coordinates if available in station data
+  const rawEast = station.entrances?.find(e => e.type === 'EAST' || e.id?.includes('EAST'));
+  const rawWest = station.entrances?.find(e => e.type === 'WEST' || e.id?.includes('WEST'));
+  const rawNorth = station.entrances?.find(e => e.type === 'NORTH' || e.id?.includes('NORTH'));
+
+  const entryEastLat = rawEast?.lat ?? +(stnLat - 0.0006).toFixed(6);
+  const entryEastLng = rawEast?.lng ?? +(stnLng + 0.0004).toFixed(6);
+  const entryWestLat = rawWest?.lat ?? +(stnLat - 0.0006).toFixed(6);
+  const entryWestLng = rawWest?.lng ?? +(stnLng - 0.0004).toFixed(6);
+
   // Real Entrances with standard IDs for accessibility and routing
-  const entryEast = { id: `NODE_${station.code}_ENTRY_EAST`, floor_id: 1, name: `${station.name} - East Entrance`, type: 'ENTRANCE', x: 200, y: 530, lat: +(stnLat - 0.0006).toFixed(6), lng: +(stnLng + 0.0004).toFixed(6), accessible: true, icon: '🚪' };
-  const entryWest = { id: `NODE_${station.code}_ENTRY_WEST`, floor_id: 1, name: `${station.name} - West Entrance`, type: 'ENTRANCE', x: 600, y: 530, lat: +(stnLat - 0.0006).toFixed(6), lng: +(stnLng - 0.0004).toFixed(6), accessible: true, icon: '🚪' };
+  const entryEast = {
+    id: `NODE_${station.code}_ENTRY_EAST`,
+    floor_id: 1,
+    name: rawEast?.name || `${station.name} - East Entrance`,
+    type: 'ENTRANCE',
+    x: 200,
+    y: 530,
+    lat: entryEastLat,
+    lng: entryEastLng,
+    accessible: true,
+    icon: '🚪'
+  };
+
+  const entryWest = {
+    id: `NODE_${station.code}_ENTRY_WEST`,
+    floor_id: 1,
+    name: rawWest?.name || `${station.name} - West Entrance`,
+    type: 'ENTRANCE',
+    x: 600,
+    y: 530,
+    lat: entryWestLat,
+    lng: entryWestLng,
+    accessible: true,
+    icon: '🚪'
+  };
   nodes.push(entryEast, entryWest);
 
+  // Optional North Entrance if present
+  let entryNorth = null;
+  if (rawNorth) {
+    entryNorth = {
+      id: `NODE_${station.code}_ENTRY_NORTH`,
+      floor_id: 1,
+      name: rawNorth.name || `${station.name} - North Gate`,
+      type: 'ENTRANCE',
+      x: 400,
+      y: 100,
+      lat: rawNorth.lat,
+      lng: rawNorth.lng,
+      accessible: rawNorth.accessible ?? true,
+      icon: '🚪'
+    };
+    nodes.push(entryNorth);
+  }
+
+  // Outdoor Perimeter Walkway Nodes & Subways connecting East and West gates
+  // (Prevents cutting straight lines through buildings when walking between entrances or along station perimeter)
+  const walkwayMid1 = {
+    id: `NODE_${station.code}_WALKWAY_ST_GEORGE`,
+    floor_id: 1,
+    name: 'St. George Road / Perimeter Sidewalk',
+    type: 'CORRIDOR',
+    isOutdoor: true,
+    x: 300,
+    y: 570,
+    lat: +((entryEastLat * 0.6) + (entryWestLat * 0.4) - 0.0001).toFixed(6),
+    lng: +((entryEastLng * 0.75) + (entryWestLng * 0.25)).toFixed(6),
+    accessible: true,
+    icon: '🚶'
+  };
+
+  const walkwayMid2 = {
+    id: `NODE_${station.code}_WALKWAY_SUBWAY_PLAZA`,
+    floor_id: 1,
+    name: 'Station Front Plaza / Subway Passage',
+    type: 'CORRIDOR',
+    isOutdoor: true,
+    x: 500,
+    y: 570,
+    lat: +((entryEastLat * 0.35) + (entryWestLat * 0.65) - 0.0001).toFixed(6),
+    lng: +((entryEastLng * 0.3) + (entryWestLng * 0.7)).toFixed(6),
+    accessible: true,
+    icon: '🚶'
+  };
+  nodes.push(walkwayMid1, walkwayMid2);
+
+  // Perimeter Walkway edges (following real street perimeter sidewalks)
+  edges.push(
+    { from_node_id: entryEast.id, to_node_id: walkwayMid1.id, distance: 70, estimated_time: 50, accessible: true, blocked: false },
+    { from_node_id: walkwayMid1.id, to_node_id: entryEast.id, distance: 70, estimated_time: 50, accessible: true, blocked: false },
+    { from_node_id: walkwayMid1.id, to_node_id: walkwayMid2.id, distance: 80, estimated_time: 55, accessible: true, blocked: false },
+    { from_node_id: walkwayMid2.id, to_node_id: walkwayMid1.id, distance: 80, estimated_time: 55, accessible: true, blocked: false },
+    { from_node_id: walkwayMid2.id, to_node_id: entryWest.id, distance: 65, estimated_time: 45, accessible: true, blocked: false },
+    { from_node_id: entryWest.id, to_node_id: walkwayMid2.id, distance: 65, estimated_time: 45, accessible: true, blocked: false }
+  );
+
+  // Concourse & Indoor Station Nodes
   const concourse = { id: `NODE_${station.code}_CONCOURSE`, floor_id: 1, name: `${station.name} Central Concourse`, type: 'CORRIDOR', x: 400, y: 440, lat: +(stnLat - 0.0002).toFixed(6), lng: +stnLng.toFixed(6), accessible: true, icon: '🧭' };
   const ticketOffice = { id: `NODE_${station.code}_TICKET`, floor_id: 1, name: 'UTS / ATVM Ticket Counters', type: 'TICKET_COUNTER', x: 300, y: 490, lat: +(stnLat - 0.0004).toFixed(6), lng: +(stnLng + 0.0002).toFixed(6), accessible: true, icon: '🎫' };
   const restroom = { id: `NODE_${station.code}_RESTROOM`, floor_id: 1, name: 'Accessible Restroom & Water Booth', type: 'RESTROOM', x: 150, y: 440, lat: +(stnLat - 0.0002).toFixed(6), lng: +(stnLng + 0.0003).toFixed(6), accessible: true, icon: '🚻' };
@@ -37,7 +130,7 @@ export function getStationLayout(stationId = 1) {
   const liftF0 = { id: `NODE_${station.code}_LIFT_F0`, floor_id: 1, name: 'Elevator Lift L-1 (Accessible)', type: 'LIFT', x: 340, y: 350, lat: +(stnLat + 0.0001).toFixed(6), lng: +(stnLng - 0.0001).toFixed(6), accessible: true, icon: '🛗' };
   const stairsF0 = { id: `NODE_${station.code}_STAIRS_F0`, floor_id: 1, name: 'Middle FOB Stairs Bank', type: 'STAIRS', x: 460, y: 350, lat: +(stnLat + 0.0001).toFixed(6), lng: +(stnLng + 0.0001).toFixed(6), accessible: false, icon: '🪜' };
 
-  // Floor 1: Foot Over Bridge (FOB)
+  // Floor 2: Foot Over Bridge (FOB)
   const fobBridge = { id: `NODE_${station.code}_FOB_BRIDGE`, floor_id: 2, name: 'Central Foot Over Bridge (FOB)', type: 'CORRIDOR', x: 400, y: 260, lat: +(stnLat + 0.0002).toFixed(6), lng: +stnLng.toFixed(6), accessible: true, icon: '🌉' };
   const liftF1 = { id: `NODE_${station.code}_LIFT_F1`, floor_id: 2, name: 'Elevator Lift L-1 (FOB Landing)', type: 'LIFT', x: 340, y: 260, lat: +(stnLat + 0.0002).toFixed(6), lng: +(stnLng - 0.0001).toFixed(6), accessible: true, icon: '🛗' };
   const stairsF1 = { id: `NODE_${station.code}_STAIRS_F1`, floor_id: 2, name: 'Middle FOB Stair Landing', type: 'STAIRS', x: 460, y: 260, lat: +(stnLat + 0.0002).toFixed(6), lng: +(stnLng + 0.0001).toFixed(6), accessible: false, icon: '🪜' };
@@ -59,16 +152,24 @@ export function getStationLayout(stationId = 1) {
     { id: 3, name: 'Aahar Tea & Snacks Stall', type: 'FOOD_COURT', node_id: foodStall.id, floor: 0, accessible: true }
   );
 
-  // Connect entrances to concourse and ticket office
+  // Connect entrances to interior ticket office & concourse
+  // Realistic cross-terminal walking distances (CSMT is 250m+ wide across 18 tracks)
   edges.push(
-    { from_node_id: entryEast.id, to_node_id: concourse.id, distance: 30, estimated_time: 22, accessible: true, blocked: false },
-    { from_node_id: concourse.id, to_node_id: entryEast.id, distance: 30, estimated_time: 22, accessible: true, blocked: false },
-    { from_node_id: entryEast.id, to_node_id: ticketOffice.id, distance: 20, estimated_time: 15, accessible: true, blocked: false },
-    { from_node_id: ticketOffice.id, to_node_id: entryEast.id, distance: 20, estimated_time: 15, accessible: true, blocked: false },
+    { from_node_id: entryEast.id, to_node_id: ticketOffice.id, distance: 40, estimated_time: 30, accessible: true, blocked: false },
+    { from_node_id: ticketOffice.id, to_node_id: entryEast.id, distance: 40, estimated_time: 30, accessible: true, blocked: false },
+    { from_node_id: ticketOffice.id, to_node_id: concourse.id, distance: 120, estimated_time: 90, accessible: true, blocked: false },
+    { from_node_id: concourse.id, to_node_id: ticketOffice.id, distance: 120, estimated_time: 90, accessible: true, blocked: false },
 
-    { from_node_id: entryWest.id, to_node_id: concourse.id, distance: 30, estimated_time: 22, accessible: true, blocked: false },
-    { from_node_id: concourse.id, to_node_id: entryWest.id, distance: 30, estimated_time: 22, accessible: true, blocked: false }
+    { from_node_id: entryWest.id, to_node_id: concourse.id, distance: 140, estimated_time: 105, accessible: true, blocked: false },
+    { from_node_id: concourse.id, to_node_id: entryWest.id, distance: 140, estimated_time: 105, accessible: true, blocked: false }
   );
+
+  if (entryNorth) {
+    edges.push(
+      { from_node_id: entryNorth.id, to_node_id: fobBridge.id, distance: 40, estimated_time: 30, accessible: true, blocked: false },
+      { from_node_id: fobBridge.id, to_node_id: entryNorth.id, distance: 40, estimated_time: 30, accessible: true, blocked: false }
+    );
+  }
 
   // Base concourse connections
   edges.push(
@@ -90,24 +191,53 @@ export function getStationLayout(stationId = 1) {
     { from_node_id: fobBridge.id, to_node_id: stairsF1.id, distance: 10, estimated_time: 8, accessible: false, blocked: false }
   );
 
-  // Generate All Actual Platforms for this station
+  // Generate All Actual Platforms for this station with realistic non-overlapping coordinates
+  const verifiedPlatformsMap = new Map();
+  if (Array.isArray(station.platforms)) {
+    station.platforms.forEach(p => {
+      if (p.number && p.lat && p.lng) {
+        verifiedPlatformsMap.set(String(p.number), p);
+      }
+    });
+  }
+
   const startX = 140;
   const endX = 680;
   const stepX = (endX - startX) / Math.max(1, numPlatforms - 1);
-  const lngSpan = 0.0008;
-  const stepLng = numPlatforms > 1 ? lngSpan / (numPlatforms - 1) : 0;
 
   for (let p = 1; p <= numPlatforms; p++) {
+    const pStr = String(p);
+    const verified = verifiedPlatformsMap.get(pStr);
     const xPos = Math.round(startX + (p - 1) * stepX);
-    const isFloor0 = p <= Math.ceil(numPlatforms / 2);
+    const isFloor0 = p <= 3;
     const floorId = isFloor0 ? 1 : 2;
 
     let serviceTag = 'Slow Local (Up/Down)';
     if (p === 3 || p === 4) serviceTag = 'Fast Local (Towards CSMT / Kalyan)';
     if (p >= 8 && station.id === 1) serviceTag = 'Outstation Mail / Express Trains';
 
-    const pltLng = +(stnLng - (lngSpan / 2) + (p - 1) * stepLng).toFixed(6);
-    const pltLat = +(stnLat + 0.0004).toFixed(6);
+    let pltLat, pltLng;
+
+    if (verified) {
+      pltLat = Number(verified.lat);
+      pltLng = Number(verified.lng);
+    } else if (station.id === 1) {
+      // CSMT: Platforms 1-7 are suburban tracks running alongside each other west-to-east
+      // Platforms 8-18 are mainline terminal tracks extending northwards
+      if (p <= 7) {
+        pltLat = +(18.9402 + (p - 1) * 0.00035).toFixed(6);
+        pltLng = +(72.8351 + (p - 1) * 0.00008).toFixed(6);
+      } else {
+        pltLat = +(18.9408 + (p - 8) * 0.00030).toFixed(6);
+        pltLng = +(72.8360 + (p - 8) * 0.00010).toFixed(6);
+      }
+    } else {
+      // General stations: distribute along track corridor
+      const latOffset = (p - 1) * 0.00035;
+      const lngOffset = ((p - 1) % 2 === 0 ? 1 : -1) * 0.00015;
+      pltLat = +(stnLat + 0.0003 + latOffset).toFixed(6);
+      pltLng = +(stnLng + lngOffset).toFixed(6);
+    }
 
     const pltNode = {
       id: `NODE_${station.code}_PLT_${p}`,
@@ -141,14 +271,14 @@ export function getStationLayout(stationId = 1) {
       type: 'CORRIDOR',
       x: xPos,
       y: 260,
-      lat: +(stnLat + 0.0002).toFixed(6),
+      lat: +(pltLat - 0.00015).toFixed(6),
       lng: pltLng,
       accessible: true,
       icon: '🌉'
     };
     nodes.push(fobBayNode);
 
-    // FOB connections
+    // FOB connections along bridge deck
     const bridgeWalkDist = Math.max(10, Math.round(Math.abs(xPos - 400) * 0.45) + 8);
     const bridgeWalkTime = Math.round(bridgeWalkDist * 0.75);
 
@@ -157,13 +287,15 @@ export function getStationLayout(stationId = 1) {
       { from_node_id: fobBayNode.id, to_node_id: fobBridge.id, distance: bridgeWalkDist, estimated_time: bridgeWalkTime, accessible: true, blocked: false }
     );
 
+    // Ramp / stairs down from FOB Bay onto platform boarding deck
     edges.push(
       { from_node_id: fobBayNode.id, to_node_id: pltNode.id, distance: 25, estimated_time: 18, accessible: true, blocked: false },
       { from_node_id: pltNode.id, to_node_id: fobBayNode.id, distance: 25, estimated_time: 18, accessible: true, blocked: false }
     );
 
+    // Terminal head walk-in platforms (Platforms 1 to 3) have direct ground level concourse access
     if (isFloor0) {
-      const distToConcourse = Math.abs(xPos - 400) + 40;
+      const distToConcourse = 35 + (p - 1) * 15;
       edges.push(
         { from_node_id: concourse.id, to_node_id: pltNode.id, distance: distToConcourse, estimated_time: Math.round(distToConcourse * 0.8), accessible: true, blocked: false },
         { from_node_id: pltNode.id, to_node_id: concourse.id, distance: distToConcourse, estimated_time: Math.round(distToConcourse * 0.8), accessible: true, blocked: false }
@@ -226,8 +358,7 @@ export function getStationLayout(stationId = 1) {
   };
 }
 
-// Pre-instantiate active station layout (Default: CSMT)
-let currentStationLayout = getStationLayout(1);
+
 
 /**
  * GET /api/stations
@@ -297,8 +428,6 @@ export function getStationById(req, res) {
   if (!layout) {
     return res.status(404).json({ success: false, error: `Station ${rawId} not found in database.` });
   }
-  currentStationLayout = layout;
-
   res.json({
     success: true,
     data: {
@@ -339,16 +468,13 @@ export function postQRScan(req, res) {
     return res.status(400).json({ success: false, error: 'A valid QR code string is required.' });
   }
 
-  let layout = currentStationLayout;
-  if (stationId !== undefined) {
-    const numericId = Number(stationId);
-    if (isNaN(numericId) || !Number.isInteger(numericId)) {
-      return res.status(400).json({ success: false, error: 'stationId must be a valid integer.' });
-    }
-    layout = getStationLayout(numericId);
-    if (!layout) {
-      return res.status(404).json({ success: false, error: `Station with ID ${stationId} not found.` });
-    }
+  const numericId = Number(stationId || 1);
+  if (isNaN(numericId) || !Number.isInteger(numericId)) {
+    return res.status(400).json({ success: false, error: 'stationId must be a valid integer.' });
+  }
+  const layout = getStationLayout(numericId);
+  if (!layout) {
+    return res.status(404).json({ success: false, error: `Station with ID ${stationId} not found.` });
   }
 
   const cleanCode = code.trim().toUpperCase();
@@ -378,16 +504,13 @@ export function postCalculateRoute(req, res) {
     return res.status(400).json({ success: false, error: 'destinationNodeId is required.' });
   }
 
-  let layout = currentStationLayout;
-  if (stationId !== undefined) {
-    const numericId = Number(stationId);
-    if (isNaN(numericId) || !Number.isInteger(numericId)) {
-      return res.status(400).json({ success: false, error: 'stationId must be a valid integer.' });
-    }
-    layout = getStationLayout(numericId);
-    if (!layout) {
-      return res.status(404).json({ success: false, error: `Station with ID ${stationId} not found.` });
-    }
+  const numericId = Number(stationId || 1);
+  if (isNaN(numericId) || !Number.isInteger(numericId)) {
+    return res.status(400).json({ success: false, error: 'stationId must be a valid integer.' });
+  }
+  const layout = getStationLayout(numericId);
+  if (!layout) {
+    return res.status(404).json({ success: false, error: `Station with ID ${stationId} not found.` });
   }
 
   const allowedModes = ['NORMAL', 'FASTEST', 'SHORTEST', 'ACCESSIBLE', 'EMERGENCY'];
@@ -446,6 +569,15 @@ export function postAIChat(req, res) {
     const route = calculateAStarRoute(layout.graph, originId, targetNodeId, accessibleMode ? 'ACCESSIBLE' : 'NORMAL');
     const destNode = layout.nodes.find(n => n.id === targetNodeId);
 
+    if (!route || !route.success) {
+      return res.json({
+        success: true,
+        reply: `${destNode.name} at ${layout.station.name} is on Floor ${destNode.floor_id || 1}. Select a starting entrance on the map to see step-by-step directions.`,
+        destinationNodeId: targetNodeId,
+        route: null
+      });
+    }
+
     return res.json({
       success: true,
       reply: `${destNode.name} at ${layout.station.name} is ${route.distance} meters away (~${Math.ceil(route.estimatedTime / 60)} minutes walk). ${route.instructions[1] || 'Follow the highlighted route on your station map.'}`,
@@ -496,6 +628,10 @@ export function postRouteSearch(req, res) {
     return res.status(404).json({ success: false, error: 'Origin or destination station not found on Mumbai Central Line.' });
   }
 
+  if (originStn.id === destStn.id) {
+    return res.status(400).json({ success: false, error: 'Departure and destination stations must be different.' });
+  }
+
   const originIdx = MUMBAI_CENTRAL_LINE_STATIONS.findIndex(s => s.id === originStn.id);
   const destIdx = MUMBAI_CENTRAL_LINE_STATIONS.findIndex(s => s.id === destStn.id);
   const numStops = Math.abs(destIdx - originIdx);
@@ -515,7 +651,7 @@ export function postRouteSearch(req, res) {
 
   const intermediateStations = [];
   const step = destIdx > originIdx ? 1 : -1;
-  for (let i = originIdx + step; i !== destIdx; i += step) {
+  for (let i = originIdx + step; i !== destIdx && i >= 0 && i < MUMBAI_CENTRAL_LINE_STATIONS.length; i += step) {
     intermediateStations.push(MUMBAI_CENTRAL_LINE_STATIONS[i]);
   }
 

@@ -1,19 +1,38 @@
+# Dependencies
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment & Secrets
 .env
 .env.local
-.env.production
+.env.development.local
+.env.test.local
+.env.production.local
 
-.next/
+# Production Build Outputs
 dist/
+dist-ssr/
 build/
+*.tsbuildinfo
 
+# Testing & Coverage
 coverage/
+.nyc_output/
 
+# Logs & Temporary Files
 *.log
+logs/
+uploads/
 
+# IDE & OS Files
 .DS_Store
-
+Thumbs.db
 .idea/
 .vscode/
-
-uploads/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

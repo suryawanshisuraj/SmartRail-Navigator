@@ -188,8 +188,8 @@ export default function RealStationMap({
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
-    const initialLat = currentLocationNode?.lat || station?.lat || 18.9400;
-    const initialLng = currentLocationNode?.lng || station?.lng || 72.8354;
+    const initialLat = currentLocationNode?.lat || station?.latitude || station?.lat || 18.9400;
+    const initialLng = currentLocationNode?.lng || station?.longitude || station?.lng || 72.8354;
 
     const map = L.map(mapContainerRef.current, {
       center: [initialLat, initialLng],
@@ -259,8 +259,8 @@ export default function RealStationMap({
   // Update map center when station changes
   useEffect(() => {
     if (!mapInstanceRef.current || !station) return;
-    const lat = station.lat || 18.9400;
-    const lng = station.lng || 72.8354;
+    const lat = station.latitude || station.lat || 18.9400;
+    const lng = station.longitude || station.lng || 72.8354;
     mapInstanceRef.current.flyTo([lat, lng], 17, {
       duration: 1.0,
       easeLinearity: 0.25
@@ -394,7 +394,7 @@ export default function RealStationMap({
       const isCurrent = currentLocationNode?.id === node.id;
       const isDest = destinationNode?.id === node.id;
 
-      if (node.type === 'CORRIDOR' && !isCurrent && !isDest && !node.name.includes('Central Station')) {
+      if ((node.type === 'CORRIDOR' || node.isPedestrianPath || node.isOutdoor) && !isCurrent && !isDest && !node.name.includes('Central Station')) {
         return;
       }
 
@@ -449,17 +449,19 @@ export default function RealStationMap({
           </div>
         `;
       } else if (node.type === 'PLATFORM') {
-        if (currentZoom < 14 && !isDest) return;
+        const pNum = Number(node.platformNumber);
+        if (currentZoom < 16 && !isDest && pNum && ![1, 4, 8, 12, 18].includes(pNum)) return;
         badgeHtml = `
-          <div style="background: #ffffff; border: 2px solid #1a73e8; color: #1a73e8; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); white-space: nowrap; display: flex; align-items: center; gap: 4px; cursor: pointer;">
-            <span>🚆</span> P${node.platformNumber}
+          <div style="background: #ffffff; border: 2px solid #1a73e8; color: #1a73e8; font-weight: 800; font-size: 11px; padding: 2px 7px; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.18); white-space: nowrap; display: flex; align-items: center; gap: 3px; cursor: pointer;">
+            <span style="font-size: 10px;">🚆</span> P${node.platformNumber}
           </div>
         `;
       } else if (node.type === 'ENTRANCE') {
         if (currentZoom < 13 && !isDest) return;
+        const gateLabel = node.name.includes('East') ? 'East Gate' : node.name.includes('West') ? 'West Gate' : node.name.includes('North') ? 'North Gate' : 'Station Entrance';
         badgeHtml = `
           <div style="background: #ffffff; border: 1.5px solid #475569; color: #1e293b; font-weight: 700; font-size: 10px; padding: 2px 7px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); white-space: nowrap; display: flex; align-items: center; gap: 3px;">
-            🚪 ${node.name.includes('East') ? 'East Gate' : 'West Gate'}
+            🚪 ${gateLabel}
           </div>
         `;
       } else if (node.type === 'LIFT') {
@@ -532,7 +534,10 @@ export default function RealStationMap({
 
     if (calculatedRoute && calculatedRoute.success && calculatedRoute.route && calculatedRoute.route.length > 1) {
       const validNodes = calculatedRoute.route.filter(n => n.lat && n.lng);
-      const latlngs = validNodes.map(n => [n.lat, n.lng]);
+      // Use high-resolution OpenStreetMap road polyline coordinates if available for 100% accurate street curves
+      const latlngs = (Array.isArray(calculatedRoute.polylineCoordinates) && calculatedRoute.polylineCoordinates.length > 1)
+        ? calculatedRoute.polylineCoordinates
+        : validNodes.map(n => [n.lat, n.lng]);
 
       if (latlngs.length > 1) {
         // Casing glow
@@ -557,14 +562,14 @@ export default function RealStationMap({
         casing.addTo(routeLayerRef.current);
         mainRoute.addTo(routeLayerRef.current);
 
-        // Directional Chevrons spaced along the route
-        const arrowStep = validNodes.length > 20 ? Math.ceil(validNodes.length / 10) : 1;
-        for (let i = 0; i < validNodes.length - 1; i += arrowStep) {
-          const from = validNodes[i];
-          const to = validNodes[Math.min(i + 1, validNodes.length - 1)];
-          const midLat = (from.lat + to.lat) / 2;
-          const midLng = (from.lng + to.lng) / 2;
-          const bearing = Math.round(calculateBearing(from.lat, from.lng, to.lat, to.lng));
+        // Directional Chevrons spaced along the actual road route
+        const arrowStep = latlngs.length > 20 ? Math.ceil(latlngs.length / 12) : 1;
+        for (let i = 0; i < latlngs.length - 1; i += arrowStep) {
+          const fromPt = latlngs[i];
+          const toPt = latlngs[Math.min(i + 1, latlngs.length - 1)];
+          const midLat = (fromPt[0] + toPt[0]) / 2;
+          const midLng = (fromPt[1] + toPt[1]) / 2;
+          const bearing = Math.round(calculateBearing(fromPt[0], fromPt[1], toPt[0], toPt[1]));
 
           const arrowIcon = L.divIcon({
             className: 'route-dir-arrow',
@@ -584,7 +589,7 @@ export default function RealStationMap({
 
         // Waypoint step badges (rendered only for key turning points, not high-density road samples)
         validNodes.forEach((n, idx) => {
-          if (idx === 0 || idx === validNodes.length - 1 || n.isRoad || n.isPedestrianPath) return;
+          if (idx === 0 || idx === validNodes.length - 1 || n.isRoad || n.isPedestrianPath || n.id?.startsWith('EXT_PED_') || n.isOutdoor) return;
           const isActiveStep = activeStepIndex === idx;
 
           const stepIcon = L.divIcon({

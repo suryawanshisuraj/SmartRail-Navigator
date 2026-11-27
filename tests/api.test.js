@@ -196,3 +196,173 @@ describe('Defensive Routing Engine Checks', () => {
     expect(result.error).toContain('Both startNodeId and destinationNodeId must be provided');
   });
 });
+
+describe('Inter-Station Route Search (postRouteSearch)', () => {
+  function createMockRes() {
+    return {
+      statusCode: 200,
+      body: null,
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(data) {
+        this.body = data;
+        return this;
+      }
+    };
+  }
+
+  it('should return 400 when origin or destination is missing', async () => {
+    const { postRouteSearch } = await import('../backend/src/controllers/transitController.js');
+    const req = { body: { origin: 'CSMT' } };
+    const res = createMockRes();
+    postRouteSearch(req, res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toContain('Both origin and destination');
+  });
+
+  it('should return 404 when station is not found on Central Line', async () => {
+    const { postRouteSearch } = await import('../backend/src/controllers/transitController.js');
+    const req = { body: { origin: 'CSMT', destination: 'NONEXISTENT_STATION' } };
+    const res = createMockRes();
+    postRouteSearch(req, res);
+    expect(res.statusCode).toBe(404);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('should return valid itinerary from CSMT to Dadar by station code', async () => {
+    const { postRouteSearch } = await import('../backend/src/controllers/transitController.js');
+    const req = { body: { origin: 'CSMT', destination: 'DR' } };
+    const res = createMockRes();
+    postRouteSearch(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.itinerary).toBeDefined();
+    expect(res.body.itinerary.origin.code).toBe('CSMT');
+    expect(res.body.itinerary.destination.code).toBe('DR');
+    expect(res.body.itinerary.totalDurationMinutes).toBeGreaterThan(0);
+    expect(res.body.itinerary.distanceKm).toBeGreaterThan(0);
+    expect(res.body.itinerary.estimatedFare).toBeGreaterThan(0);
+    expect(res.body.itinerary.legs.length).toBe(3); // BOARDING, TRANSIT, ALIGHTING
+  });
+
+  it('should return valid itinerary using station ID as origin', async () => {
+    const { postRouteSearch } = await import('../backend/src/controllers/transitController.js');
+    const req = { body: { origin: 1, destination: 'Kalyan' } };
+    const res = createMockRes();
+    postRouteSearch(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.itinerary.destination.code).toBe('KYN');
+  });
+
+  it('should use fast train type when preference is fastest and stops > 5', async () => {
+    const { postRouteSearch } = await import('../backend/src/controllers/transitController.js');
+    const req = { body: { origin: 'CSMT', destination: 'KYN', options: { preference: 'fastest' } } };
+    const res = createMockRes();
+    postRouteSearch(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.itinerary.trainType).toBe('Fast Suburban Local');
+  });
+});
+
+describe('Fare Calculation (postCalculateFare)', () => {
+  function createMockRes() {
+    return {
+      statusCode: 200,
+      body: null,
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(data) {
+        this.body = data;
+        return this;
+      }
+    };
+  }
+
+  it('should calculate standard fare for default distance', async () => {
+    const { postCalculateFare } = await import('../backend/src/controllers/transitController.js');
+    const req = { body: {} };
+    const res = createMockRes();
+    postCalculateFare(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.fareSummary).toBeDefined();
+    expect(res.body.fareSummary.totalFare).toBeGreaterThan(0);
+    expect(res.body.fareSummary.basePrice).toBeGreaterThan(0);
+  });
+
+  it('should apply off-peak discount when isOffPeak is true', async () => {
+    const { postCalculateFare } = await import('../backend/src/controllers/transitController.js');
+
+    const reqPeak = { body: { distanceKm: 20, travelClass: 'STANDARD', isOffPeak: false } };
+    const resPeak = createMockRes();
+    postCalculateFare(reqPeak, resPeak);
+
+    const reqOffPeak = { body: { distanceKm: 20, travelClass: 'STANDARD', isOffPeak: true } };
+    const resOffPeak = createMockRes();
+    postCalculateFare(reqOffPeak, resOffPeak);
+
+    expect(resOffPeak.body.fareSummary.discountApplied).toBeGreaterThan(0);
+    expect(resOffPeak.body.fareSummary.totalFare).toBeLessThan(resPeak.body.fareSummary.totalFare);
+  });
+
+  it('should apply FIRST class multiplier (2.2x) on fare', async () => {
+    const { postCalculateFare } = await import('../backend/src/controllers/transitController.js');
+
+    const reqStd = { body: { distanceKm: 15, travelClass: 'STANDARD' } };
+    const resStd = createMockRes();
+    postCalculateFare(reqStd, resStd);
+
+    const reqFirst = { body: { distanceKm: 15, travelClass: 'FIRST' } };
+    const resFirst = createMockRes();
+    postCalculateFare(reqFirst, resFirst);
+
+    expect(resFirst.body.fareSummary.basePrice).toBeGreaterThan(resStd.body.fareSummary.basePrice);
+    expect(resFirst.body.fareSummary.totalFare).toBeGreaterThan(resStd.body.fareSummary.totalFare);
+  });
+
+  it('should handle invalid distanceKm gracefully by defaulting to 10', async () => {
+    const { postCalculateFare } = await import('../backend/src/controllers/transitController.js');
+    const req = { body: { distanceKm: 'invalid' } };
+    const res = createMockRes();
+    postCalculateFare(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.fareSummary.totalFare).toBeGreaterThan(0);
+  });
+
+  it('should reject route search when origin and destination are the same station', async () => {
+    const { postRouteSearch } = await import('../backend/src/controllers/transitController.js');
+    const req = { body: { origin: 'CSMT', destination: 'CSMT' } };
+    const res = createMockRes();
+    postRouteSearch(req, res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toContain('different');
+  });
+
+  it('should handle AI chat with non-existent start node without crashing', async () => {
+    const { postAIChat } = await import('../backend/src/controllers/transitController.js');
+    const req = { body: { message: 'Where is Platform 1?', startNodeId: 'INVALID_NONEXISTENT_NODE', stationId: 1 } };
+    const res = createMockRes();
+    postAIChat(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.reply).toBeDefined();
+  });
+
+  it('should generate complete layout for CBD Belapur station with real coordinates', async () => {
+    const { getStationLayout } = await import('../backend/src/controllers/transitController.js');
+    const layout = getStationLayout(108);
+    expect(layout).toBeDefined();
+    expect(layout.station.code).toBe('BEPR');
+    expect(layout.station.name).toBe('CBD Belapur');
+    expect(layout.nodes.some(n => n.type === 'PLATFORM')).toBe(true);
+    expect(layout.nodes.some(n => n.type === 'ENTRANCE')).toBe(true);
+  });
+});

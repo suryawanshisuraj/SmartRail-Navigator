@@ -40,8 +40,35 @@ if (!process.env.VERCEL) {
   }, 30000);
 }
 
-wss.on('connection', ws => {
-  console.log('[WebSocket] Client connected to station real-time event gateway.');
+// WebSocket allowed origins (reuse CORS_ORIGIN env var)
+const WS_ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || 'http://localhost:5173,http://localhost:5000')
+  .split(',')
+  .map(o => o.trim());
+const MAX_WS_CONNECTIONS = 50;
+
+// Verify origin on WebSocket upgrade
+wss.on('headers', (headers, req) => {
+  const origin = req.headers.origin;
+  if (origin && !WS_ALLOWED_ORIGINS.includes(origin)) {
+    console.warn(`[WebSocket] Rejected connection from unauthorized origin: ${origin}`);
+  }
+});
+
+wss.on('connection', (ws, req) => {
+  // Enforce connection limit
+  if (wss.clients.size > MAX_WS_CONNECTIONS) {
+    ws.close(1013, 'Server at capacity. Try again later.');
+    return;
+  }
+
+  // Verify origin
+  const origin = req.headers.origin;
+  if (origin && !WS_ALLOWED_ORIGINS.includes(origin)) {
+    ws.close(1008, 'Origin not allowed.');
+    return;
+  }
+
+  console.log(`[WebSocket] Client connected (${wss.clients.size}/${MAX_WS_CONNECTIONS}).`);
 
   // Initial welcome event
   ws.send(JSON.stringify({
@@ -56,12 +83,12 @@ wss.on('connection', ws => {
         ws.send(JSON.stringify({ type: 'pong' }));
       }
     } catch (e) {
-      console.error('[WebSocket] Failed to parse client message:', e);
+      console.error('[WebSocket] Failed to parse client message:', e.message);
     }
   });
 
   ws.on('close', () => {
-    console.log('[WebSocket] Client disconnected.');
+    console.log(`[WebSocket] Client disconnected (${wss.clients.size}/${MAX_WS_CONNECTIONS}).`);
   });
 });
 

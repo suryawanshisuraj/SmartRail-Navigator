@@ -146,16 +146,17 @@ export default function App() {
       let targetStationId = selectedStationId;
       let targetStationData = stationData;
 
-      // If user is within 3km of another station, auto-switch to that station
-      if (nearestStation && nearestId && nearestId !== selectedStationId && distanceToNearest < 3000) {
+      // If user is within 6km of another station, auto-switch to that station
+      if (nearestStation && nearestId && nearestId !== selectedStationId && distanceToNearest < 6000) {
         setAnnouncement(`Live GPS detected you near ${nearestStation.name} (${(distanceToNearest / 1000).toFixed(1)} km away). Switching station...`);
         setSelectedStationId(nearestId);
         targetStationId = nearestId;
         targetStationData = await fetchStationData(nearestId);
         setStationData(targetStationData);
         setGpsDistanceNotice(null);
-      } else {
-        const distToTarget = haversineDistanceMeters(pos.lat, pos.lng, targetStationData?.lat || 18.94, targetStationData?.lng || 72.835);
+        const targetLat = targetStationData?.latitude || targetStationData?.lat || 18.94;
+        const targetLng = targetStationData?.longitude || targetStationData?.lng || 72.835;
+        const distToTarget = haversineDistanceMeters(pos.lat, pos.lng, targetLat, targetLng);
         if (distToTarget > 2500 && nearestStation) {
           setGpsDistanceNotice({
             isFar: true,

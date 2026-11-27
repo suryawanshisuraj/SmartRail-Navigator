@@ -370,25 +370,18 @@ export async function computeIndoorRoute(startNodeId, destinationNodeId, routeTy
 
     // Convert real pedestrian coordinates into route waypoints along actual OSM footpaths/roads
     const coords = pedRoute.coordinates || [];
-    const step = coords.length > 60 ? Math.ceil(coords.length / 40) : 1;
-    const roadWaypoints = [];
+    const roadWaypoints = coords.map((pt, i) => ({
+      id: `PED_WAYPOINT_${i}`,
+      name: i === 0 ? 'Road Entrance' : `Pedestrian Path (${i + 1})`,
+      floor_id: 1,
+      lat: pt[0],
+      lng: pt[1],
+      accessible: true,
+      isPedestrianPath: true
+    }));
 
-    for (let i = 0; i < coords.length; i += step) {
-      const pt = coords[i];
-      roadWaypoints.push({
-        id: `PED_WAYPOINT_${i}`,
-        name: `Pedestrian Path (${i + 1})`,
-        floor_id: 1,
-        lat: pt[0],
-        lng: pt[1],
-        accessible: true,
-        isPedestrianPath: true
-      });
-    }
-
-    if (roadWaypoints.length > 0) {
-      roadWaypoints[0] = { ...customGpsNode, floor_id: 1 };
-    }
+    // Prepend user's actual Live GPS position as the initial starting waypoint
+    roadWaypoints.unshift({ ...customGpsNode, floor_id: 1 });
 
     // Check if indoor mapping is available for this station (Level 1 vs Level 2)
     const hasIndoorMap = stationObj?.hasIndoorMap !== false;
@@ -413,6 +406,12 @@ export async function computeIndoorRoute(startNodeId, destinationNodeId, routeTy
         }
       ];
 
+      const outdoorPolyline = [
+        [customGpsNode.lat, customGpsNode.lng],
+        ...coords,
+        [nearestEntrance.lat, nearestEntrance.lng]
+      ];
+
       return {
         success: true,
         level: 1,
@@ -421,6 +420,7 @@ export async function computeIndoorRoute(startNodeId, destinationNodeId, routeTy
         distance: pedRoute.distance,
         estimatedTime: pedRoute.duration,
         route: outdoorRouteNodes,
+        polylineCoordinates: outdoorPolyline,
         instructions: outdoorManeuvers.map(m => m.instruction),
         maneuvers: outdoorManeuvers,
         routeType,
@@ -438,6 +438,13 @@ export async function computeIndoorRoute(startNodeId, destinationNodeId, routeTy
       ...roadWaypoints,
       nearestEntrance,
       ...indoorNodes
+    ];
+
+    const indoorPolyline = [
+      [customGpsNode.lat, customGpsNode.lng],
+      ...coords,
+      [nearestEntrance.lat, nearestEntrance.lng],
+      ...indoorNodes.filter(n => n.lat && n.lng).map(n => [n.lat, n.lng])
     ];
 
     const combinedManeuvers = [
@@ -471,6 +478,7 @@ export async function computeIndoorRoute(startNodeId, destinationNodeId, routeTy
       distance: totalDistance,
       estimatedTime: totalTime,
       route: combinedRouteNodes,
+      polylineCoordinates: indoorPolyline,
       instructions: combinedManeuvers.map(m => m.instruction),
       maneuvers: combinedManeuvers,
       routeType,
@@ -479,6 +487,45 @@ export async function computeIndoorRoute(startNodeId, destinationNodeId, routeTy
       roadDurationMinutes: pedRoute.durationMinutes,
       accessibilityStatus: routeType === 'ACCESSIBLE' ? true : combinedRouteNodes.every(n => n.accessible)
     };
+  }
+
+  // Check if routing between two entrance/street nodes (e.g. East Gate to West Gate)
+  const layout = getClientStationLayout(stationId);
+  const startNode = layout?.nodes?.find(n => n.id === startNodeId);
+  const destNode = layout?.nodes?.find(n => n.id === destinationNodeId);
+
+  if (startNode?.type === 'ENTRANCE' && destNode?.type === 'ENTRANCE' && startNode.lat && destNode.lat && startNodeId !== destinationNodeId) {
+    try {
+      const pedRoute = await fetchRealPedestrianRoute(startNode.lat, startNode.lng, destNode.lat, destNode.lng);
+      if (pedRoute && pedRoute.success && pedRoute.coordinates?.length > 1) {
+        const roadWaypoints = pedRoute.coordinates.map((pt, i) => ({
+          id: `EXT_PED_${i}`,
+          name: i === 0 ? startNode.name : i === pedRoute.coordinates.length - 1 ? destNode.name : `Pedestrian Path (${i + 1})`,
+          floor_id: 1,
+          lat: pt[0],
+          lng: pt[1],
+          accessible: true,
+          isPedestrianPath: true
+        }));
+        roadWaypoints[0] = startNode;
+        roadWaypoints[roadWaypoints.length - 1] = destNode;
+
+        return {
+          success: true,
+          distance: pedRoute.distance,
+          estimatedTime: pedRoute.duration,
+          route: roadWaypoints,
+          polylineCoordinates: pedRoute.coordinates,
+          instructions: pedRoute.maneuvers.map(m => m.instruction),
+          maneuvers: pedRoute.maneuvers,
+          routeType,
+          isPedestrianRoute: true,
+          accessibilityStatus: true
+        };
+      }
+    } catch (e) {
+      // Fall through to topological station graph routing
+    }
   }
 
   // Standard backend routing with fallback
@@ -491,8 +538,8 @@ export async function computeIndoorRoute(startNodeId, destinationNodeId, routeTy
     if (!res.ok) throw new Error('Routing calculation failed');
     return await res.json();
   } catch (err) {
-    const layout = getClientStationLayout(stationId);
-    return calculateClientAStarRoute(layout.graph, startNodeId, destinationNodeId, routeType);
+    const localLayout = getClientStationLayout(stationId);
+    return calculateClientAStarRoute(localLayout.graph, startNodeId, destinationNodeId, routeType);
   }
 }
 
@@ -535,6 +582,15 @@ export async function askAIAssistant(message, startNodeId, accessibleMode = fals
       const originId = startNodeId || layout.nodes[0].id;
       const route = calculateClientAStarRoute(layout.graph, originId, targetNodeId, accessibleMode ? 'ACCESSIBLE' : 'NORMAL');
       const destNode = layout.nodes.find(n => n.id === targetNodeId);
+
+      if (!route || !route.success) {
+        return {
+          success: true,
+          reply: `${destNode.name} at ${layout.station.name} is on Floor ${destNode.floor_id || 1}. Select a starting entrance on the map to see step-by-step directions.`,
+          destinationNodeId: targetNodeId,
+          route: null
+        };
+      }
 
       return {
         success: true,

@@ -29,6 +29,11 @@ export default function RouteSearch({ stations = [], accessibleMode, onSelectSta
 
   const handleSearch = async (e) => {
     if (e) e.preventDefault();
+    if (Number(origin) === Number(destination)) {
+      setError('Departure and destination stations must be different.');
+      setItineraryResult(null);
+      return;
+    }
     setError(null);
     setLoading(true);
 

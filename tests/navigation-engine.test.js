@@ -104,3 +104,71 @@ describe('Real GPS Geolocation & Direction Calculations', () => {
   });
 });
 
+describe('Real Geographic Wayfinding & Platform Layout', () => {
+  it('should ensure all 18 platforms at CSMT have distinct non-overlapping geographic coordinates', async () => {
+    const { getStationLayout } = await import('../backend/src/controllers/transitController.js');
+    const layout = getStationLayout(1); // CSMT
+    const platforms = layout.nodes.filter(n => n.type === 'PLATFORM');
+    expect(platforms.length).toBe(18);
+
+    // Verify all 18 platforms have distinct (lat, lng) pairs (no overlapping clump)
+    const coordSet = new Set();
+    platforms.forEach(p => {
+      const key = `${p.lat.toFixed(5)}_${p.lng.toFixed(5)}`;
+      expect(coordSet.has(key)).toBe(false);
+      coordSet.add(key);
+    });
+
+    // Platforms 1 to 7 are suburban (west side), Platforms 8 to 18 are mainline (east side)
+    const p1 = platforms.find(p => p.platformNumber === '1');
+    const p18 = platforms.find(p => p.platformNumber === '18');
+    expect(p1.lng).toBeLessThan(p18.lng);
+  });
+
+  it('should route between East Entrance and West Entrance via realistic perimeter walkway without building clipping', async () => {
+    const { getStationLayout } = await import('../backend/src/controllers/transitController.js');
+    const layout = getStationLayout(1);
+
+    const result = calculateAStarRoute(layout.graph, 'NODE_CSMT_ENTRY_EAST', 'NODE_CSMT_ENTRY_WEST', 'NORMAL');
+    expect(result.success).toBe(true);
+    expect(result.route.length).toBeGreaterThanOrEqual(4);
+
+    // Route must traverse the perimeter walkway / sidewalk nodes
+    const hasPerimeter = result.route.some(n => n.id.includes('WALKWAY') || n.isOutdoor);
+    expect(hasPerimeter).toBe(true);
+
+    // Turn-by-turn guidance must be generated
+    expect(result.instructions.length).toBeGreaterThan(0);
+    expect(result.maneuvers.length).toBeGreaterThan(0);
+  });
+
+  it('should maintain 100% accessible lift path to platform 18 without stairs', async () => {
+    const { getStationLayout } = await import('../backend/src/controllers/transitController.js');
+    const layout = getStationLayout(1);
+
+    const result = calculateAStarRoute(layout.graph, 'NODE_CSMT_ENTRY_EAST', 'NODE_CSMT_PLT_18', 'ACCESSIBLE');
+    expect(result.success).toBe(true);
+    expect(result.accessibilityStatus).toBe(true);
+    expect(result.route.some(n => n.type === 'STAIRS')).toBe(false);
+    expect(result.route.some(n => n.type === 'LIFT')).toBe(true);
+  });
+
+  it('should ensure client fallback station layout behaves identically for perimeter and accessible routing', async () => {
+    const { getClientStationLayout } = await import('../frontend/src/services/clientTransitFallback.js');
+    const layout = getClientStationLayout(1);
+    expect(layout).toBeDefined();
+
+    // Perimeter routing check
+    const perimRoute = calculateAStarRoute(layout.graph, 'NODE_CSMT_ENTRY_EAST', 'NODE_CSMT_ENTRY_WEST', 'NORMAL');
+    expect(perimRoute.success).toBe(true);
+    expect(perimRoute.route.some(n => n.id.includes('WALKWAY') || n.isOutdoor)).toBe(true);
+
+    // Accessible routing to Platform 18 check
+    const accessRoute = calculateAStarRoute(layout.graph, 'NODE_CSMT_ENTRY_EAST', 'NODE_CSMT_PLT_18', 'ACCESSIBLE');
+    expect(accessRoute.success).toBe(true);
+    expect(accessRoute.route.some(n => n.type === 'STAIRS')).toBe(false);
+    expect(accessRoute.route.some(n => n.type === 'LIFT')).toBe(true);
+  });
+});
+
+

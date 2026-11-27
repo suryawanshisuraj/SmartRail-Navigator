@@ -32,5 +32,5 @@ docker run --name smartrail-postgres \
 
 ---
 
-## 2. In-Memory & SQLite Fallback
-For local development and automated testing where a live PostgreSQL instance is not available, the backend includes an embedded JSON topology fallback (`data/stations.json` and `data/trains.json`) which mimics the exact relational graph structure in-memory.
+## 2. In-Memory Fallback
+For local development and automated testing where a live PostgreSQL instance is not available, the system includes an embedded station graph dataset (`data/realIndianStations.js`) which mimics the exact relational graph structure in-memory for 50+ stations along the Mumbai Suburban Railway Network.
