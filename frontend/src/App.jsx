@@ -54,7 +54,26 @@ export default function App() {
       setStationData(data);
 
       const defaultStart = data.nodes.find(n => n.id === 'NODE_MAIN_ENTRANCE' || n.type === 'ENTRANCE') || data.nodes[0];
-      setCurrentLocationNode(defaultStart);
+
+      // Preserve active real GPS node if GPS is already locked
+      let activeStartNode = defaultStart;
+      if (isGpsActive && realGpsPosition) {
+        activeStartNode = {
+          id: 'NODE_USER_REAL_GPS',
+          name: 'My Live GPS Location',
+          floor_id: 1,
+          lat: realGpsPosition.lat,
+          lng: realGpsPosition.lng,
+          x: defaultStart.x || 80,
+          y: defaultStart.y || 480,
+          type: 'ENTRANCE',
+          isRealGps: true,
+          accuracy: realGpsPosition.accuracy,
+          heading: realGpsPosition.heading,
+          description: `Live GPS: ${realGpsPosition.lat.toFixed(5)}, ${realGpsPosition.lng.toFixed(5)}`
+        };
+      }
+      setCurrentLocationNode(activeStartNode);
 
       // Default destination: Platform 1 or first platform, or targetDestId if provided
       let destNode = null;
@@ -72,10 +91,11 @@ export default function App() {
 
       // Route computation
       const initialRoute = await computeIndoorRoute(
-        defaultStart.id,
+        activeStartNode.id,
         destId,
         accessibleMode ? 'ACCESSIBLE' : routeType,
-        stnId
+        stnId,
+        activeStartNode.isRealGps ? activeStartNode : null
       );
       setCalculatedRoute(initialRoute);
       setActiveFloor(0);
@@ -85,7 +105,7 @@ export default function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [accessibleMode, routeType]);
+  }, [accessibleMode, routeType, isGpsActive, realGpsPosition]);
 
   // Initial catalog fetch & first station setup with URL hash check
   useEffect(() => {
@@ -175,28 +195,33 @@ export default function App() {
       let targetStationId = selectedStationId;
       let targetStationData = stationData;
 
-      // If user is within 6km of another station, auto-switch to that station
-      if (nearestStation && nearestId && nearestId !== selectedStationId && distanceToNearest < 6000) {
-        setAnnouncement(`Live GPS detected you near ${nearestStation.name} (${(distanceToNearest / 1000).toFixed(1)} km away). Switching station...`);
+      // Always switch to nearest station if user is not currently on it
+      if (nearestStation && nearestId && nearestId !== selectedStationId) {
+        setAnnouncement(`Live GPS detected you closest to ${nearestStation.name} (${(distanceToNearest / 1000).toFixed(1)} km away). Switching station...`);
         setSelectedStationId(nearestId);
         targetStationId = nearestId;
         targetStationData = await fetchStationData(nearestId);
         setStationData(targetStationData);
+
+        const params = new URLSearchParams(window.location.hash.replace('#', ''));
+        params.set('tab', activeTab);
+        params.set('station', nearestId);
+        window.history.replaceState(null, '', `#${params.toString()}`);
+      }
+
+      const targetLat = targetStationData?.latitude || targetStationData?.lat || 18.94;
+      const targetLng = targetStationData?.longitude || targetStationData?.lng || 72.835;
+      const distToTarget = haversineDistanceMeters(pos.lat, pos.lng, targetLat, targetLng);
+      if (distToTarget > 2500 && nearestStation) {
+        setGpsDistanceNotice({
+          isFar: true,
+          distanceKm: +(distToTarget / 1000).toFixed(1),
+          nearestStation,
+          nearestDistanceKm: +(distanceToNearest / 1000).toFixed(1),
+          targetStationName: targetStationData?.name || 'Selected Station'
+        });
+      } else {
         setGpsDistanceNotice(null);
-        const targetLat = targetStationData?.latitude || targetStationData?.lat || 18.94;
-        const targetLng = targetStationData?.longitude || targetStationData?.lng || 72.835;
-        const distToTarget = haversineDistanceMeters(pos.lat, pos.lng, targetLat, targetLng);
-        if (distToTarget > 2500 && nearestStation) {
-          setGpsDistanceNotice({
-            isFar: true,
-            distanceKm: +(distToTarget / 1000).toFixed(1),
-            nearestStation,
-            nearestDistanceKm: +(distanceToNearest / 1000).toFixed(1),
-            targetStationName: targetStationData?.name || 'Selected Station'
-          });
-        } else {
-          setGpsDistanceNotice(null);
-        }
       }
 
       // Find closest entrance in target station data
@@ -246,6 +271,27 @@ export default function App() {
     } finally {
       setIsGpsLoading(false);
     }
+  };
+
+  // Handle Manual Entrance Gate Selection
+  const handleSelectStartGate = async (gateNodeId) => {
+    if (!stationData) return;
+    const selectedGate = stationData.nodes.find(n => n.id === gateNodeId);
+    if (!selectedGate) return;
+
+    setIsGpsActive(false);
+    setGpsDistanceNotice(null);
+    setCurrentLocationNode(selectedGate);
+
+    const targetDest = selectedDestinationId || (stationData.nodes.find(n => n.type === 'PLATFORM')?.id) || stationData.nodes[1]?.id;
+    const res = await computeIndoorRoute(
+      selectedGate.id,
+      targetDest,
+      accessibleMode ? 'ACCESSIBLE' : routeType,
+      selectedStationId
+    );
+    setCalculatedRoute(res);
+    setAnnouncement(`Starting gate set to ${selectedGate.name}. Route recalculated.`);
   };
 
   // QR Location detected
@@ -576,6 +622,7 @@ export default function App() {
                 isGpsActive={isGpsActive}
                 isGpsLoading={isGpsLoading}
                 realGpsPosition={realGpsPosition}
+                onSelectStartGate={handleSelectStartGate}
               />
 
               <AIAssistantDrawer

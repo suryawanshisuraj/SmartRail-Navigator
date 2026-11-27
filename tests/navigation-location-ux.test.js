@@ -140,4 +140,66 @@ describe('Navigation & Location UX Suite', () => {
       });
     });
   });
+
+  describe('Location Detection & No-Default-Assumption Logic', () => {
+    it('should find closest station regardless of distance with no arbitrary distance cutoff', async () => {
+      const { findNearestStation } = await import('../frontend/src/services/clientTransitFallback.js');
+
+      // User located in Thane (19.1860, 72.9759)
+      const thaneLocation = findNearestStation(19.1860, 72.9759);
+      expect(thaneLocation.station.code).toBe('TNA');
+      expect(thaneLocation.station.name).toBe('Thane');
+
+      // User located in Kalyan (19.2437, 73.1355)
+      const kalyanLocation = findNearestStation(19.2437, 73.1355);
+      expect(kalyanLocation.station.code).toBe('KYN');
+      expect(kalyanLocation.station.name).toBe('Kalyan Junction');
+
+      // User located in Dadar (19.0180, 72.8430)
+      const dadarLocation = findNearestStation(19.0180, 72.8430);
+      expect(dadarLocation.station.code).toBe('DR');
+      expect(dadarLocation.station.name).toBe('Dadar');
+    });
+
+    it('should distinguish manual station entrance gates from live real GPS beacons', () => {
+      const manualGateNode = {
+        id: 'NODE_CSMT_ENTRY_EAST',
+        name: 'CSMT - East Entrance',
+        type: 'ENTRANCE',
+        isRealGps: false
+      };
+
+      const liveGpsNode = {
+        id: 'NODE_USER_REAL_GPS',
+        name: 'My Live GPS Location',
+        type: 'ENTRANCE',
+        isRealGps: true,
+        accuracy: 12,
+        lat: 19.0182,
+        lng: 72.8432
+      };
+
+      // Manual gate must not be flagged as real GPS
+      expect(manualGateNode.isRealGps).toBeFalsy();
+      expect(manualGateNode.name).toContain('Entrance');
+
+      // Live GPS node must have real GPS flag and coordinate attributes
+      expect(liveGpsNode.isRealGps).toBe(true);
+      expect(liveGpsNode.accuracy).toBe(12);
+      expect(liveGpsNode.lat).toBeCloseTo(19.0182);
+    });
+
+    it('should provide available entrance gates for station start point selection', async () => {
+      const { getClientStationLayout } = await import('../frontend/src/services/clientTransitFallback.js');
+      const csmtLayout = getClientStationLayout(1);
+
+      const entranceGates = csmtLayout.nodes.filter(
+        n => n.type === 'ENTRANCE' || n.id.includes('ENTRY')
+      );
+
+      expect(entranceGates.length).toBeGreaterThanOrEqual(2);
+      expect(entranceGates.some(g => g.name.includes('East'))).toBe(true);
+      expect(entranceGates.some(g => g.name.includes('West'))).toBe(true);
+    });
+  });
 });

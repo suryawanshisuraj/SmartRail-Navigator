@@ -401,8 +401,10 @@ export default function RealStationMap({
       let badgeHtml = '';
 
       if (isCurrent) {
-        // Draw accuracy circle for real GPS
-        if (node.isRealGps || isGpsActive) {
+        const isLiveGpsBeacon = isGpsActive && (node.isRealGps || currentLocationNode?.isRealGps);
+
+        if (isLiveGpsBeacon) {
+          // Draw accuracy circle ONLY for real GPS
           L.circle([node.lat, node.lng], {
             radius: node.accuracy || 25,
             color: '#1a73e8',
@@ -411,31 +413,42 @@ export default function RealStationMap({
             weight: 1.5,
             dashArray: '4, 4'
           }).addTo(markersLayerRef.current);
-        }
 
-        // Live blue location dot with directional flashlight heading cone
-        badgeHtml = `
-          <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px;">
-            <div style="position: absolute; width: 56px; height: 56px; transform: rotate(${headingAngle}deg); pointer-events: none; z-index: 1;">
-              <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
-                <path d="M28 28 L14 4 A 28 28 0 0 1 42 4 Z" fill="url(#blueHeadingBeam)" opacity="0.7" />
-                <defs>
-                  <linearGradient id="blueHeadingBeam" x1="28" y1="28" x2="28" y2="4" gradientUnits="userSpaceOnUse">
-                    <stop stop-color="#1a73e8" stop-opacity="0.85" />
-                    <stop offset="1" stop-color="#1a73e8" stop-opacity="0" />
-                  </linearGradient>
-                </defs>
-              </svg>
-            </div>
-            <div style="position: absolute; width: 36px; height: 36px; border-radius: 50%; background: rgba(26, 115, 232, 0.3); animation: gmapPulse 2s infinite; z-index: 2;"></div>
-            <div style="width: 20px; height: 20px; border-radius: 50%; background: #1a73e8; border: 3px solid #ffffff; box-shadow: 0 2px 10px rgba(0,0,0,0.4); z-index: 3;"></div>
-            ${node.isRealGps ? `
+          // Live blue location dot with directional flashlight heading cone
+          badgeHtml = `
+            <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px;">
+              <div style="position: absolute; width: 56px; height: 56px; transform: rotate(${headingAngle}deg); pointer-events: none; z-index: 1;">
+                <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+                  <path d="M28 28 L14 4 A 28 28 0 0 1 42 4 Z" fill="url(#blueHeadingBeam)" opacity="0.7" />
+                  <defs>
+                    <linearGradient id="blueHeadingBeam" x1="28" y1="28" x2="28" y2="4" gradientUnits="userSpaceOnUse">
+                      <stop stop-color="#1a73e8" stop-opacity="0.85" />
+                      <stop offset="1" stop-color="#1a73e8" stop-opacity="0" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+              <div style="position: absolute; width: 36px; height: 36px; border-radius: 50%; background: rgba(26, 115, 232, 0.3); animation: gmapPulse 2s infinite; z-index: 2;"></div>
+              <div style="width: 20px; height: 20px; border-radius: 50%; background: #1a73e8; border: 3px solid #ffffff; box-shadow: 0 2px 10px rgba(0,0,0,0.4); z-index: 3;"></div>
               <div style="position: absolute; bottom: -18px; background: #0284c7; color: white; font-size: 9px; font-weight: 800; padding: 1px 6px; border-radius: 6px; white-space: nowrap; z-index: 4; box-shadow: 0 1px 3px rgba(0,0,0,0.3);">
                 LIVE GPS
               </div>
-            ` : ''}
-          </div>
-        `;
+            </div>
+          `;
+        } else {
+          // Clean Station Entrance / Gate Pin (NOT GPS) - Prevents confusing false GPS beacon
+          badgeHtml = `
+            <div style="position: relative; -webkit-transform: translate(-50%, -100%); transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center;">
+              <svg width="32" height="42" viewBox="0 0 32 42" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 3px 6px rgba(0,0,0,0.35));">
+                <path d="M16 0C7.163 0 0 7.163 0 16c0 12 16 26 16 26s16-14 16-26c0-8.837-7.163-16-16-16z" fill="#16a34a"/>
+                <circle cx="16" cy="16" r="6.5" fill="#ffffff"/>
+              </svg>
+              <div style="margin-top: -6px; background: #16a34a; color: white; font-weight: 800; font-size: 11px; padding: 2px 8px; border-radius: 10px; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.25); display: flex; align-items: center; gap: 4px;">
+                <span>🟢</span> Start: ${node.name || 'Station Entrance'}
+              </div>
+            </div>
+          `;
+        }
       } else if (isDest) {
         badgeHtml = `
           <div style="position: relative; -webkit-transform: translate(-50%, -100%); transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center;">
@@ -481,11 +494,12 @@ export default function RealStationMap({
         `;
       }
 
+      const isLiveGpsBeacon = isCurrent && isGpsActive && (node.isRealGps || currentLocationNode?.isRealGps);
       const customIcon = L.divIcon({
         className: 'google-maps-pin-wrapper',
         html: badgeHtml,
-        iconSize: isCurrent ? [44, 44] : isDest ? [34, 44] : [30, 30],
-        iconAnchor: isCurrent ? [22, 22] : isDest ? [17, 44] : [15, 15]
+        iconSize: isLiveGpsBeacon ? [44, 44] : (isCurrent || isDest) ? [34, 44] : [30, 30],
+        iconAnchor: isLiveGpsBeacon ? [22, 22] : (isCurrent || isDest) ? [17, 44] : [15, 15]
       });
 
       const marker = L.marker([node.lat, node.lng], { icon: customIcon });
@@ -675,11 +689,17 @@ export default function RealStationMap({
 
   const handleRecenterStation = () => {
     if (!mapInstanceRef.current) return;
-    const targetLat = currentLocationNode?.lat || station?.lat || 18.9400;
-    const targetLng = currentLocationNode?.lng || station?.lng || 72.8354;
-    mapInstanceRef.current.flyTo([targetLat, targetLng], 17, {
-      duration: 0.8
-    });
+    if (isGpsActive && currentLocationNode?.isRealGps && currentLocationNode?.lat && currentLocationNode?.lng) {
+      mapInstanceRef.current.flyTo([currentLocationNode.lat, currentLocationNode.lng], 17, {
+        duration: 0.8
+      });
+    } else {
+      const targetLat = station?.latitude || station?.lat || 18.9400;
+      const targetLng = station?.longitude || station?.lng || 72.8354;
+      mapInstanceRef.current.flyTo([targetLat, targetLng], 17, {
+        duration: 0.8
+      });
+    }
   };
 
   const activeManeuver = maneuvers[activeStepIndex] || maneuvers[0];

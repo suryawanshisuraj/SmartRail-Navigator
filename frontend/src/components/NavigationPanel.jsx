@@ -32,13 +32,19 @@ export default function NavigationPanel({
   onDetectRealLocation,
   isGpsActive,
   isGpsLoading,
-  realGpsPosition
+  realGpsPosition,
+  onSelectStartGate
 }) {
   const [isSpeaking, setIsSpeaking] = useState(false);
 
   // Group destinations by Platforms vs Amenities
   const platformDestinations = destinations.filter(d => d.type === 'PLATFORM');
   const facilityDestinations = destinations.filter(d => d.type !== 'PLATFORM');
+
+  // Available entrance gates for station
+  const availableGates = (station?.nodes || []).filter(
+    n => n.type === 'ENTRANCE' || n.id?.includes('ENTRY') || n.name?.includes('Entrance') || n.name?.includes('Gate')
+  );
 
   const speakInstructions = () => {
     if (!('speechSynthesis' in window)) {
@@ -99,65 +105,124 @@ export default function NavigationPanel({
         </button>
       </div>
 
-      {/* Start Location Card with Real GPS Button */}
+      {/* Start Location Card with Real GPS Button & Gate Selector */}
       <div style={{
         background: isGpsActive ? '#f0f9ff' : '#f8fafc',
-        border: isGpsActive ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
+        border: isGpsActive ? '1.5px solid #0284c7' : '1px solid #cbd5e1',
         borderRadius: 'var(--radius-md)',
         padding: '0.75rem 0.9rem',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '0.75rem'
+        flexDirection: 'column',
+        gap: '0.65rem'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <div style={{
-            width: '28px',
-            height: '28px',
-            borderRadius: '50%',
-            background: isGpsActive ? '#0284c7' : '#e2e8f0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: isGpsActive ? '#ffffff' : '#64748b',
-            flexShrink: 0
-          }}>
-            <LocateFixed size={16} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
-              {isGpsActive ? '📍 Live Real GPS Starting Point' : 'Start Location (Station Gate)'}
-            </div>
-            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>
-              {currentLocationNode?.name || 'Main Entrance'}
-            </div>
-          </div>
-        </div>
-
-        {onDetectRealLocation && (
-          <button
-            type="button"
-            onClick={onDetectRealLocation}
-            disabled={isGpsLoading}
-            style={{
-              background: isGpsActive ? '#0284c7' : '#ffffff',
-              color: isGpsActive ? '#ffffff' : '#0284c7',
-              border: isGpsActive ? 'none' : '1.5px solid #0284c7',
-              borderRadius: '8px',
-              padding: '0.35rem 0.65rem',
-              fontSize: '0.72rem',
-              fontWeight: 800,
-              cursor: 'pointer',
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <div style={{
+              width: '30px',
+              height: '30px',
+              borderRadius: '50%',
+              background: isGpsActive ? '#0284c7' : '#e2e8f0',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.3rem',
-              whiteSpace: 'nowrap',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
-            }}
-          >
-            <LocateFixed size={13} />
-            <span>{isGpsLoading ? 'Locating...' : isGpsActive ? 'GPS Locked 🟢' : 'Use Real GPS'}</span>
-          </button>
+              justifyContent: 'center',
+              color: isGpsActive ? '#ffffff' : '#475569',
+              flexShrink: 0
+            }}>
+              {isGpsActive ? <LocateFixed size={16} /> : <span style={{ fontSize: '14px' }}>🚪</span>}
+            </div>
+            <div>
+              <div style={{ fontSize: '0.68rem', color: isGpsActive ? '#0284c7' : '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                {isGpsActive ? '📍 Live Real GPS Satellites' : 'Station Entrance Gate (Start Point)'}
+              </div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>
+                {isGpsActive
+                  ? `${realGpsPosition ? `${realGpsPosition.lat.toFixed(4)}°N, ${realGpsPosition.lng.toFixed(4)}°E (±${realGpsPosition.accuracy || 10}m)` : 'GPS Active'}`
+                  : (currentLocationNode?.name || 'Main Entrance')}
+              </div>
+            </div>
+          </div>
+
+          {onDetectRealLocation && (
+            <button
+              type="button"
+              onClick={onDetectRealLocation}
+              disabled={isGpsLoading}
+              style={{
+                background: isGpsActive ? '#0284c7' : '#ffffff',
+                color: isGpsActive ? '#ffffff' : '#0284c7',
+                border: '1.5px solid #0284c7',
+                borderRadius: '8px',
+                padding: '0.35rem 0.65rem',
+                fontSize: '0.72rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+                whiteSpace: 'nowrap',
+                boxShadow: isGpsActive ? '0 2px 4px rgba(2, 132, 199, 0.25)' : '0 1px 3px rgba(0,0,0,0.08)'
+              }}
+            >
+              <LocateFixed size={13} />
+              <span>{isGpsLoading ? 'Locating...' : isGpsActive ? 'GPS Locked 🟢' : 'Use Real GPS'}</span>
+            </button>
+          )}
+        </div>
+
+        {/* Manual Gate Selector or Switch back to Manual Gate Button */}
+        {isGpsActive ? (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.35rem', borderTop: '1px solid #e0f2fe' }}>
+            <span style={{ fontSize: '0.7rem', color: '#0369a1', fontWeight: 600 }}>
+              Live navigation active from your GPS coordinates
+            </span>
+            {availableGates.length > 0 && onSelectStartGate && (
+              <button
+                type="button"
+                onClick={() => onSelectStartGate(availableGates[0].id)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#64748b',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  textDecoration: 'underline'
+                }}
+              >
+                Switch to Station Gate
+              </button>
+            )}
+          </div>
+        ) : (
+          availableGates.length > 1 && onSelectStartGate && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingTop: '0.35rem', borderTop: '1px solid #f1f5f9' }}>
+              <label htmlFor="station-gate-picker" style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' }}>
+                Change Gate:
+              </label>
+              <select
+                id="station-gate-picker"
+                aria-label="Select station entrance gate"
+                value={currentLocationNode?.id || availableGates[0]?.id}
+                onChange={(e) => onSelectStartGate(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.3rem 0.5rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#0f172a'
+                }}
+              >
+                {availableGates.map(gate => (
+                  <option key={gate.id} value={gate.id}>
+                    {gate.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )
         )}
       </div>
 

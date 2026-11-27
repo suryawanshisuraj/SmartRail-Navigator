@@ -515,19 +515,24 @@ export default function Navbar({
         {/* Desktop Controls & Tools Toolbar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
           {/* Current Location Badge */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.45rem',
-            background: isGpsActive ? '#f0f9ff' : '#f1f5f9',
-            border: isGpsActive ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
-            padding: '0.4rem 0.85rem',
-            borderRadius: 'var(--radius-full)',
-            fontSize: '0.78rem'
-          }}>
-            <span style={{ color: 'var(--text-secondary)' }}>{isGpsActive ? '📍 GPS Point:' : 'Gate:'}</span>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              background: isGpsActive ? '#f0f9ff' : '#f1f5f9',
+              border: isGpsActive ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
+              padding: '0.4rem 0.85rem',
+              borderRadius: 'var(--radius-full)',
+              fontSize: '0.78rem'
+            }}
+            title={isGpsActive ? 'Live Real GPS coordinates active' : 'Manual Station Gate start point'}
+          >
+            <span style={{ color: isGpsActive ? '#0284c7' : '#64748b', fontWeight: 700 }}>
+              {isGpsActive ? '📍 Real GPS:' : '🚪 Gate:'}
+            </span>
             <strong style={{ color: isGpsActive ? '#0284c7' : '#0f172a' }}>
-              {currentLocationNode?.name || 'Main Entrance'}
+              {currentLocationNode?.name || 'Station Entrance'}
             </strong>
           </div>
 

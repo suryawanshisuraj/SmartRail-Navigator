@@ -117,10 +117,10 @@ export async function getLiveGPSPosition() {
           let msg = 'Failed to retrieve location.';
           if (err.code === 1) msg = 'Location permission was denied. Please allow location access in your browser settings.';
           else if (err.code === 2) msg = 'Location position unavailable. Please ensure GPS/location services are enabled.';
-          else if (err.code === 3) msg = 'Location request timed out. Please try again.';
+          else if (err.code === 3) msg = 'Location request timed out. Please try again or select your station manually.';
           reject(new Error(msg));
         },
-        { enableHighAccuracy: false, timeout: 5000, maximumAge: 30000 }
+        { enableHighAccuracy: false, timeout: 15000, maximumAge: 30000 }
       );
     };
 
@@ -137,14 +137,14 @@ export async function getLiveGPSPosition() {
       },
       err => {
         if (err.code === 3 || err.code === 2) {
-          // High-accuracy GPS hardware timed out; fall back to standard/emulated provider
+          // High-accuracy GPS hardware timed out or unavailable; fall back to standard/network provider
           tryStandardAccuracy();
         } else {
           let msg = 'Location permission was denied. Please allow location access in your browser settings.';
           reject(new Error(msg));
         }
       },
-      { enableHighAccuracy: true, timeout: 3500, maximumAge: 10000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 }
     );
   });
 }
