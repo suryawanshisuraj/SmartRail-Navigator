@@ -311,6 +311,34 @@ describe('Fare Calculation (postCalculateFare)', () => {
     expect(resOffPeak.body.fareSummary.totalFare).toBeLessThan(resPeak.body.fareSummary.totalFare);
   });
 
+  it('should apply concession discounts for SENIOR, STUDENT, and CHILD', async () => {
+    const { postCalculateFare } = await import('../backend/src/controllers/transitController.js');
+
+    const reqAdult = { body: { distanceKm: 30, passengerType: 'ADULT' } };
+    const resAdult = createMockRes();
+    postCalculateFare(reqAdult, resAdult);
+
+    const reqSenior = { body: { distanceKm: 30, passengerType: 'SENIOR' } };
+    const resSenior = createMockRes();
+    postCalculateFare(reqSenior, resSenior);
+
+    const reqStudent = { body: { distanceKm: 30, passengerType: 'STUDENT' } };
+    const resStudent = createMockRes();
+    postCalculateFare(reqStudent, resStudent);
+
+    const reqChild = { body: { distanceKm: 30, passengerType: 'CHILD' } };
+    const resChild = createMockRes();
+    postCalculateFare(reqChild, resChild);
+
+    expect(resSenior.body.fareSummary.concessionRate).toBe(0.30);
+    expect(resStudent.body.fareSummary.concessionRate).toBe(0.40);
+    expect(resChild.body.fareSummary.concessionRate).toBe(0.50);
+
+    expect(resSenior.body.fareSummary.totalFare).toBeLessThan(resAdult.body.fareSummary.totalFare);
+    expect(resStudent.body.fareSummary.totalFare).toBeLessThan(resSenior.body.fareSummary.totalFare);
+    expect(resChild.body.fareSummary.totalFare).toBeLessThan(resStudent.body.fareSummary.totalFare);
+  });
+
   it('should apply FIRST class multiplier (2.2x) on fare', async () => {
     const { postCalculateFare } = await import('../backend/src/controllers/transitController.js');
 

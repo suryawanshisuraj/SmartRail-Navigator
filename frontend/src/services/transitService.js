@@ -701,12 +701,12 @@ export async function searchRoute(origin, destination, options = {}) {
 /**
  * Dynamic Fare Tariff Calculator
  */
-export async function calculateFareTariff(distanceKm = 10, travelClass = 'STANDARD', isOffPeak = false) {
+export async function calculateFareTariff(distanceKm = 10, travelClass = 'STANDARD', isOffPeak = false, passengerType = 'ADULT') {
   try {
     const res = await fetch(`${API_BASE}/fare/calculate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ distanceKm, travelClass, isOffPeak })
+      body: JSON.stringify({ distanceKm, travelClass, isOffPeak, passengerType })
     });
     if (!res.ok) throw new Error('API fare failed');
     return await res.json();
@@ -718,8 +718,15 @@ export async function calculateFareTariff(distanceKm = 10, travelClass = 'STANDA
     const basePrice = +(2.50 * mult).toFixed(2);
     const distanceCharge = +(dist * 0.12 * mult).toFixed(2);
     const subtotal = +(basePrice + distanceCharge).toFixed(2);
-    const discountApplied = isOffPeak ? +(subtotal * 0.15).toFixed(2) : 0;
-    const taxable = subtotal - discountApplied;
+
+    const typeNormalized = String(passengerType).toUpperCase();
+    const concessionRates = { SENIOR: 0.30, STUDENT: 0.40, CHILD: 0.50, ADULT: 0 };
+    const concessionRate = concessionRates[typeNormalized] || 0;
+    const offPeakRate = isOffPeak ? 0.15 : 0;
+    const totalDiscountRate = Math.min(0.80, offPeakRate + concessionRate);
+
+    const discountApplied = +(subtotal * totalDiscountRate).toFixed(2);
+    const taxable = Math.max(0, +(subtotal - discountApplied).toFixed(2));
     const tax = +(taxable * 0.08).toFixed(2);
     const totalFare = +(taxable + tax).toFixed(2);
 
@@ -729,6 +736,9 @@ export async function calculateFareTariff(distanceKm = 10, travelClass = 'STANDA
         basePrice,
         distanceCharge,
         discountApplied,
+        passengerType: typeNormalized,
+        concessionRate,
+        isOffPeak: Boolean(isOffPeak),
         tax,
         totalFare
       }

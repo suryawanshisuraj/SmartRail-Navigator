@@ -58,19 +58,20 @@ export default function LiveTrainTracker({ liveUpdates }) {
                   justifyContent: 'space-between',
                   padding: '1rem',
                   borderRadius: 'var(--radius-md)',
-                  border: isSelected ? '1px solid var(--accent-cyan)' : '1px solid var(--border-glass)',
-                  background: isSelected ? 'var(--accent-cyan-glow)' : 'rgba(255, 255, 255, 0.02)',
-                  color: 'var(--text-primary)',
+                  border: isSelected ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
+                  background: isSelected ? '#f0f9ff' : '#ffffff',
+                  color: '#0f172a',
                   cursor: 'pointer',
                   textAlign: 'left',
-                  transition: 'all 0.2s ease'
+                  boxShadow: isSelected ? '0 2px 8px rgba(2, 132, 199, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  transition: 'all 0.15s ease'
                 }}
               >
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.2rem' }}>
+                  <div style={{ fontWeight: 800, fontSize: '0.95rem', marginBottom: '0.2rem', color: isSelected ? '#0369a1' : '#0f172a' }}>
                     {train.serviceName}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
                     {train.origin} → {train.destination}
                   </div>
                 </div>
@@ -79,7 +80,7 @@ export default function LiveTrainTracker({ liveUpdates }) {
                   <span className={`badge ${isDelayed ? 'badge-amber' : 'badge-emerald'}`}>
                     {isDelayed ? `+${train.delayMinutes}m Late` : 'On Time'}
                   </span>
-                  <div style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
+                  <div style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#475569', marginTop: '0.3rem' }}>
                     {train.speedKmph} km/h
                   </div>
                 </div>
@@ -90,88 +91,88 @@ export default function LiveTrainTracker({ liveUpdates }) {
       </div>
 
       {/* Live Train Telemetry Dashboard */}
-      <div className="glass-panel" style={{ padding: '2rem' }}>
+      <div className="glass-panel" style={{ padding: '2rem', background: '#ffffff' }}>
         {/* Header telemetry badge */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
-              <span className="badge" style={{ background: `${active.color}22`, color: active.color, border: `1px solid ${active.color}44` }}>
+              <span className="badge" style={{ background: `${active.color}18`, color: active.color, border: `1px solid ${active.color}35`, fontWeight: 800 }}>
                 {active.lineName}
               </span>
               <span className="badge badge-cyan">{active.trainType}</span>
             </div>
-            <h3 style={{ fontSize: '1.75rem', fontWeight: 800 }}>{active.serviceName}</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+            <h3 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a' }}>{active.serviceName}</h3>
+            <p style={{ color: '#64748b', fontSize: '0.85rem' }}>
               Corridor: {active.origin} to {active.destination}
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.03)', padding: '0.5rem 1rem', borderRadius: 'var(--radius-full)', border: '1px solid var(--border-glass)' }}>
-            <div className="pulse-dot" style={{ background: 'var(--accent-emerald)' }} />
-            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#ecfdf5', padding: '0.5rem 1rem', borderRadius: 'var(--radius-full)', border: '1px solid #a7f3d0' }}>
+            <div className="pulse-dot" style={{ background: '#059669', width: '8px', height: '8px', borderRadius: '50%' }} />
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#047857' }}>
               GPS Satellite Lock: Active
             </span>
           </div>
         </div>
 
-        {/* Telemetry Metrics Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem', marginBottom: '2rem' }}>
-          <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <Gauge size={14} color="var(--accent-cyan)" /> Live Speed
+        {/* Telemetry Metrics Grid (Responsive) */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <Gauge size={14} color="#0284c7" /> Live Speed
             </div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', marginTop: '0.25rem' }}>
-              {active.speedKmph} <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>km/h</span>
+            <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: '#0f172a', marginTop: '0.25rem' }}>
+              {active.speedKmph} <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 500 }}>km/h</span>
             </div>
           </div>
 
-          <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Schedule Adherence</div>
-            <div style={{ fontSize: '1.35rem', fontWeight: 700, marginTop: '0.45rem' }}>
-              <span className={`badge ${active.delayMinutes > 0 ? 'badge-amber' : 'badge-emerald'}`} style={{ fontSize: '0.9rem' }}>
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>Schedule Adherence</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 700, marginTop: '0.45rem' }}>
+              <span className={`badge ${active.delayMinutes > 0 ? 'badge-amber' : 'badge-emerald'}`} style={{ fontSize: '0.85rem' }}>
                 {active.delayMinutes > 0 ? `Delayed ${active.delayMinutes}m` : 'Perfect Schedule'}
               </span>
             </div>
           </div>
 
-          <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <MapPin size={14} color="var(--accent-gold)" /> Next Station Stop
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <MapPin size={14} color="#d97706" /> Next Station Stop
             </div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700, marginTop: '0.45rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '0.45rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {active.nextStop}
             </div>
           </div>
 
-          <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Signal Block State</div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#34d399', display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.45rem' }}>
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>Signal Block State</div>
+            <div style={{ fontSize: '0.925rem', fontWeight: 800, color: '#059669', display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.45rem' }}>
               <Zap size={16} /> Block Green Clear
             </div>
           </div>
         </div>
 
         {/* Route Progress Bar Simulation */}
-        <div style={{ background: 'rgba(15, 23, 42, 0.7)', padding: '1.5rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-glass)' }}>
+        <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: 'var(--radius-lg)', border: '1px solid #e2e8f0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-            <span style={{ fontWeight: 600 }}>{active.origin}</span>
-            <span style={{ color: 'var(--text-secondary)' }}>Track Progress: {Math.round((active.progress || 0.45) * 100)}%</span>
-            <span style={{ fontWeight: 600 }}>{active.destination}</span>
+            <span style={{ fontWeight: 800, color: '#0f172a' }}>{active.origin}</span>
+            <span style={{ color: '#64748b', fontWeight: 600 }}>Track Progress: {Math.round((active.progress || 0.45) * 100)}%</span>
+            <span style={{ fontWeight: 800, color: '#0f172a' }}>{active.destination}</span>
           </div>
 
-          <div style={{ width: '100%', height: '10px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: 'var(--radius-full)', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ width: '100%', height: '10px', background: '#e2e8f0', borderRadius: 'var(--radius-full)', position: 'relative', overflow: 'hidden' }}>
             <div style={{
               width: `${(active.progress || 0.45) * 100}%`,
               height: '100%',
-              background: `linear-gradient(90deg, ${active.color}, var(--accent-cyan))`,
+              background: `linear-gradient(90deg, ${active.color}, #0284c7)`,
               borderRadius: 'var(--radius-full)',
               transition: 'width 1s linear'
             }} />
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', fontSize: '0.78rem', color: '#64748b', flexWrap: 'wrap', gap: '0.5rem' }}>
             <span>Departed: 13:55</span>
-            <span style={{ color: 'var(--accent-cyan)' }}>Approaching Signal Junction 4</span>
+            <span style={{ color: '#0284c7', fontWeight: 700 }}>Approaching Signal Junction 4</span>
             <span>Est. Arrival: 14:48</span>
           </div>
         </div>

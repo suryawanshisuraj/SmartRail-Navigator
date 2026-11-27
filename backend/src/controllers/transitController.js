@@ -701,7 +701,7 @@ export function postRouteSearch(req, res) {
  * POST /api/fare/calculate
  */
 export function postCalculateFare(req, res) {
-  const { distanceKm = 10, travelClass = 'STANDARD', isOffPeak = false } = req.body || {};
+  const { distanceKm = 10, travelClass = 'STANDARD', isOffPeak = false, passengerType = 'ADULT' } = req.body || {};
   const dist = Math.max(1, Number(distanceKm) || 10);
   const multipliers = { STANDARD: 1.0, BUSINESS: 1.6, FIRST: 2.2 };
   const mult = multipliers[travelClass?.toUpperCase()] || 1.0;
@@ -709,8 +709,16 @@ export function postCalculateFare(req, res) {
   const basePrice = +(2.50 * mult).toFixed(2);
   const distanceCharge = +(dist * 0.12 * mult).toFixed(2);
   const subtotal = +(basePrice + distanceCharge).toFixed(2);
-  const discountApplied = isOffPeak ? +(subtotal * 0.15).toFixed(2) : 0;
-  const taxable = subtotal - discountApplied;
+
+  // Concession discount: SENIOR (30%), STUDENT (40%), CHILD (50%), ADULT (0%)
+  const typeNormalized = String(passengerType).toUpperCase();
+  const concessionRates = { SENIOR: 0.30, STUDENT: 0.40, CHILD: 0.50, ADULT: 0 };
+  const concessionRate = concessionRates[typeNormalized] || 0;
+  const offPeakRate = isOffPeak ? 0.15 : 0;
+  const totalDiscountRate = Math.min(0.80, offPeakRate + concessionRate);
+
+  const discountApplied = +(subtotal * totalDiscountRate).toFixed(2);
+  const taxable = Math.max(0, +(subtotal - discountApplied).toFixed(2));
   const tax = +(taxable * 0.08).toFixed(2);
   const totalFare = +(taxable + tax).toFixed(2);
 
@@ -720,6 +728,9 @@ export function postCalculateFare(req, res) {
       basePrice,
       distanceCharge,
       discountApplied,
+      passengerType: typeNormalized,
+      concessionRate,
+      isOffPeak: Boolean(isOffPeak),
       tax,
       totalFare
     }

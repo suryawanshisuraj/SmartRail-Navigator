@@ -148,25 +148,31 @@ export default function RouteSearch({ stations = [], accessibleMode, onSelectSta
                 { id: 'fastest', label: 'Fastest' },
                 { id: 'least_transfers', label: 'Fewest Transfers' },
                 { id: 'cheapest', label: 'Cheapest' }
-              ].map(opt => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setPreference(opt.id)}
-                  style={{
-                    padding: '0.5rem',
-                    fontSize: '0.78rem',
-                    fontWeight: 600,
-                    borderRadius: 'var(--radius-sm)',
-                    border: preference === opt.id ? '1px solid var(--accent-cyan)' : '1px solid var(--border-glass)',
-                    background: preference === opt.id ? 'var(--accent-cyan-glow)' : 'rgba(255, 255, 255, 0.03)',
-                    color: preference === opt.id ? '#ffffff' : 'var(--text-secondary)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {opt.label}
-                </button>
-              ))}
+              ].map(opt => {
+                const isSelected = preference === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setPreference(opt.id)}
+                    aria-pressed={isSelected}
+                    style={{
+                      padding: '0.55rem',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      borderRadius: 'var(--radius-sm)',
+                      border: isSelected ? '1.5px solid #0284c7' : '1px solid #cbd5e1',
+                      background: isSelected ? '#f0f9ff' : '#ffffff',
+                      color: isSelected ? '#0369a1' : '#475569',
+                      boxShadow: isSelected ? '0 2px 6px rgba(2, 132, 199, 0.12)' : '0 1px 2px rgba(0,0,0,0.02)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -177,10 +183,11 @@ export default function RouteSearch({ stations = [], accessibleMode, onSelectSta
               gap: '0.5rem',
               padding: '0.65rem 0.85rem',
               borderRadius: 'var(--radius-md)',
-              background: 'rgba(16, 185, 129, 0.1)',
-              border: '1px solid rgba(16, 185, 129, 0.25)',
-              color: '#34d399',
-              fontSize: '0.78rem'
+              background: '#ecfdf5',
+              border: '1px solid #a7f3d0',
+              color: '#047857',
+              fontSize: '0.78rem',
+              fontWeight: 600
             }}>
               <ShieldCheck size={16} />
               <span>Step-free accessibility routing strictly enforced.</span>
@@ -201,18 +208,18 @@ export default function RouteSearch({ stations = [], accessibleMode, onSelectSta
       {/* Itinerary Results Panel */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {error && (
-          <div className="glass-panel" style={{ padding: '1.5rem', borderColor: 'rgba(244, 63, 94, 0.4)', background: 'rgba(244, 63, 94, 0.08)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#fb7185' }}>
+          <div className="glass-panel" style={{ padding: '1.5rem', borderColor: '#fecdd3', background: '#fff1f2' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#be123c' }}>
               <AlertCircle size={20} />
-              <span style={{ fontWeight: 600 }}>{error}</span>
+              <span style={{ fontWeight: 700 }}>{error}</span>
             </div>
           </div>
         )}
 
         {!itineraryResult && !error && (
-          <div className="glass-panel" style={{ padding: '3rem 2rem', textAlign: 'center' }}>
+          <div className="glass-panel" style={{ padding: '3rem 2rem', textAlign: 'center', background: '#ffffff' }}>
             <Navigation2 size={42} color="var(--accent-cyan)" style={{ margin: '0 auto 1rem', opacity: 0.8 }} />
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '0.5rem' }}>Ready to Navigate</h3>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.5rem', color: '#0f172a' }}>Ready to Navigate</h3>
             <p style={{ color: 'var(--text-secondary)', maxWidth: '420px', margin: '0 auto', fontSize: '0.875rem' }}>
               Select departure and arrival hubs above to view optimized train schedules, transfer platform numbers, and step-free travel routes.
             </p>
@@ -220,14 +227,14 @@ export default function RouteSearch({ stations = [], accessibleMode, onSelectSta
         )}
 
         {itineraryResult && (
-          <div className="glass-panel" style={{ padding: '1.75rem' }}>
+          <div className="glass-panel" style={{ padding: '1.75rem', background: '#ffffff' }}>
             {/* Header Metrics */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-glass)', paddingBottom: '1.25rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-glass)', paddingBottom: '1.25rem', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
               <div>
                 <span className="badge badge-emerald" style={{ marginBottom: '0.4rem' }}>
                   Optimal Transit Solution
                 </span>
-                <h3 style={{ fontSize: '1.35rem', fontWeight: 800 }}>
+                <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a' }}>
                   {itineraryResult.origin.name} → {itineraryResult.destination.name}
                 </h3>
               </div>
@@ -240,23 +247,23 @@ export default function RouteSearch({ stations = [], accessibleMode, onSelectSta
             </div>
 
             {/* Quick Stats Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
-              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '0.75rem', borderRadius: 'var(--radius-md)' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Total Duration</div>
-                <div style={{ fontSize: '1.15rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.2rem' }}>
-                  <Clock size={16} color="var(--accent-gold)" />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 110px), 1fr))', gap: '0.85rem', marginBottom: '1.5rem' }}>
+              <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Total Duration</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.2rem' }}>
+                  <Clock size={16} color="#d97706" />
                   {itineraryResult.totalDurationMinutes} mins
                 </div>
               </div>
-              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '0.75rem', borderRadius: 'var(--radius-md)' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Distance</div>
-                <div style={{ fontSize: '1.15rem', fontWeight: 700, marginTop: '0.2rem', fontFamily: 'var(--font-mono)' }}>
+              <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Distance</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem', fontFamily: 'var(--font-mono)' }}>
                   {itineraryResult.totalDistanceKm} km
                 </div>
               </div>
-              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '0.75rem', borderRadius: 'var(--radius-md)' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Transfers</div>
-                <div style={{ fontSize: '1.15rem', fontWeight: 700, marginTop: '0.2rem' }}>
+              <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Transfers</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
                   {itineraryResult.transferCount === 0 ? 'Direct Ride' : `${itineraryResult.transferCount} Transfer(s)`}
                 </div>
               </div>
@@ -264,7 +271,7 @@ export default function RouteSearch({ stations = [], accessibleMode, onSelectSta
 
             {/* Leg Details */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Journey Segments
               </h4>
 
@@ -272,8 +279,8 @@ export default function RouteSearch({ stations = [], accessibleMode, onSelectSta
                 <div
                   key={idx}
                   style={{
-                    background: 'rgba(15, 23, 42, 0.6)',
-                    border: '1px solid var(--border-glass)',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
                     borderRadius: 'var(--radius-md)',
                     padding: '1.25rem',
                     position: 'relative'
@@ -284,24 +291,24 @@ export default function RouteSearch({ stations = [], accessibleMode, onSelectSta
                       <span className="badge badge-cyan" style={{ marginBottom: '0.35rem' }}>
                         {leg.lineName}
                       </span>
-                      <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>
+                      <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>
                         {leg.fromStationName} → {leg.toStationName}
                       </div>
                     </div>
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
                       {leg.durationMinutes} mins
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.825rem', color: '#475569', flexWrap: 'wrap' }}>
                     <div>
-                      Board at: <strong style={{ color: 'var(--text-primary)' }}>{leg.fromPlatform}</strong>
+                      Board at: <strong style={{ color: '#0f172a' }}>{leg.fromPlatform}</strong>
                     </div>
                     <div>
-                      Arrive at: <strong style={{ color: 'var(--text-primary)' }}>{leg.toPlatform}</strong>
+                      Arrive at: <strong style={{ color: '#0f172a' }}>{leg.toPlatform}</strong>
                     </div>
                     {leg.isAccessible && (
-                      <div style={{ color: '#34d399', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <div style={{ color: '#059669', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: 700 }}>
                         <ShieldCheck size={14} /> Step-Free
                       </div>
                     )}
